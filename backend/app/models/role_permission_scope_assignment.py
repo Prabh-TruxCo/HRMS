@@ -21,6 +21,6 @@ class RolePermissionScopeAssignment(Base):
         index=True,
     )
 
-    scope_entity_id: Mapped[int] = mapped_column(
-        nullable=False,
+    scope_entity_id: Mapped[int | None] = mapped_column(
+        nullable=True,
     )
