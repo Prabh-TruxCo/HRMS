@@ -56,6 +56,16 @@ class Company(Base):
         nullable=False,
         default="Asia/Kolkata",
     )
+    
+    color: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+    )
+
+    logo: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+    )
 
     is_active: Mapped[bool] = mapped_column(
         Boolean,
