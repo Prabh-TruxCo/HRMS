@@ -16,6 +16,7 @@ type CompanySetupModalProps = {
 const EMPTY_COMPANY: CompanySetup = {
   id: "",
   companyName: "",
+  companyCode: "",
   industry: "",
   companySize: "",
   country: "India",
@@ -32,6 +33,7 @@ export default function CompanySetupModal({
 
   const canSave =
     form.companyName.trim().length > 0 &&
+    form.companyCode.trim().length > 0 &&
     form.industry.length > 0 &&
     form.companySize.length > 0 &&
     form.country.length > 0;
@@ -46,15 +48,30 @@ export default function CompanySetupModal({
     }));
   };
 
+  const handleCompanyCodeChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const value = event.target.value
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "")
+      .slice(0, 10);
+
+    updateForm("companyCode", value);
+  };
+
   const handleLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     updateForm("logo", event.target.files?.[0] ?? null);
   };
 
   const handleSave = () => {
-    if (!canSave) return;
+    if (!canSave) {
+      return;
+    }
 
     onSave({
       ...form,
+      companyName: form.companyName.trim(),
+      companyCode: form.companyCode.trim().toUpperCase(),
       id: form.id || crypto.randomUUID(),
     });
   };
@@ -92,25 +109,52 @@ export default function CompanySetupModal({
 
         {/* Content */}
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
-          {/* Company Name */}
-          <div>
-            <label
-              htmlFor="companyName"
-              className="mb-2 block text-[13px] font-medium text-[#414940]"
-            >
-              Company name
-            </label>
+          {/* Company Name + Company Code */}
+          <div className="grid gap-5 md:grid-cols-2">
+            {/* Company Name */}
+            <div>
+              <label
+                htmlFor="companyName"
+                className="mb-2 block text-[13px] font-medium text-[#414940]"
+              >
+                Company name
+              </label>
 
-            <input
-              id="companyName"
-              type="text"
-              value={form.companyName}
-              onChange={(event) =>
-                updateForm("companyName", event.target.value)
-              }
-              placeholder="e.g. Acme Technologies"
-              className="h-11 w-full rounded-xl border border-[#D9DED7] bg-white px-3.5 text-sm text-[#29352A] outline-none transition placeholder:text-[#A2A9A0] focus:border-[#7EA278] focus:ring-4 focus:ring-[#5F8F59]/10"
-            />
+              <input
+                id="companyName"
+                type="text"
+                value={form.companyName}
+                onChange={(event) =>
+                  updateForm("companyName", event.target.value)
+                }
+                placeholder="e.g. Truxco Technologies"
+                className="h-11 w-full rounded-xl border border-[#D9DED7] bg-white px-3.5 text-sm text-[#29352A] outline-none transition placeholder:text-[#A2A9A0] focus:border-[#7EA278] focus:ring-4 focus:ring-[#5F8F59]/10"
+              />
+            </div>
+
+            {/* Company Code */}
+            <div>
+              <label
+                htmlFor="companyCode"
+                className="mb-2 block text-[13px] font-medium text-[#414940]"
+              >
+                Company code
+              </label>
+
+              <input
+                id="companyCode"
+                type="text"
+                value={form.companyCode}
+                onChange={handleCompanyCodeChange}
+                placeholder="e.g. TRX"
+                maxLength={10}
+                className="h-11 w-full rounded-xl border border-[#D9DED7] bg-white px-3.5 text-sm uppercase tracking-wide text-[#29352A] outline-none transition placeholder:normal-case placeholder:tracking-normal placeholder:text-[#A2A9A0] focus:border-[#7EA278] focus:ring-4 focus:ring-[#5F8F59]/10"
+              />
+
+              <p className="mt-1.5 text-[11px] text-[#929A90]">
+                Used as the prefix for employee IDs, e.g. TRX/2026/0001.
+              </p>
+            </div>
           </div>
 
           {/* Industry */}
@@ -148,6 +192,7 @@ export default function CompanySetupModal({
 
           {/* Size + Country */}
           <div className="mt-6 grid gap-5 md:grid-cols-2">
+            {/* Company Size */}
             <div>
               <label className="mb-3 block text-[13px] font-medium text-[#414940]">
                 Company size
@@ -175,6 +220,7 @@ export default function CompanySetupModal({
               </div>
             </div>
 
+            {/* Country */}
             <div>
               <label
                 htmlFor="country"

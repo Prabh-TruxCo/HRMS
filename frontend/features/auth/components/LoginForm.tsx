@@ -3,12 +3,22 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowRight, Check, Eye, EyeOff } from "lucide-react";
 
+import { useRegistration } from "@/features/auth/context/RegistrationContext";
+type RegistrationData = {
+  first_name: string;
+  last_name: string;
+  email: string;
+  password: string;
+};
+
+import { loginAccount } from "@/features/auth/services/authService";
+
 export default function LoginForm() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
-
+  const { registrationData, setRegistrationData } = useRegistration();
   const switchToSignup = () => {
     setMode("signup");
   };
@@ -67,6 +77,8 @@ export default function LoginForm() {
             showPassword={showPassword}
             setShowPassword={setShowPassword}
             onSignIn={switchToSignin}
+            registrationData={registrationData}
+            setRegistrationData={setRegistrationData}
             onContinue={() => router.push("/setup")}
           />
         )}
@@ -92,6 +104,36 @@ function SignInForm({
   setRememberMe: React.Dispatch<React.SetStateAction<boolean>>;
   onCreateWorkspace: () => void;
 }) {
+  const router = useRouter();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (isSubmitting) return;
+
+    setError("");
+    setIsSubmitting(true);
+
+    try {
+      await loginAccount({
+        email: email.trim(),
+        password,
+      });
+
+      router.replace("/dashboard");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Unable to sign in.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="mt-8">
       <div>
@@ -106,8 +148,15 @@ function SignInForm({
         </p>
       </div>
 
-      <form className="mt-7 space-y-5">
-        <Input label="Work email" type="email" placeholder="you@company.com" />
+      <form className="mt-7 space-y-5" onSubmit={handleSubmit}>
+        <Input
+          label="Work email"
+          type="email"
+          placeholder="you@company.com"
+          required
+          value={email}
+          onChange={setEmail}
+        />
 
         <div>
           <label className="mb-2 block text-sm font-medium text-[#40483F]">
@@ -116,8 +165,11 @@ function SignInForm({
 
           <div className="relative">
             <input
+              required
               type={showPassword ? "text" : "password"}
               placeholder="Enter your password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
               className="h-11 w-full rounded-xl border border-[#DDE2D9] bg-white px-3.5 pr-11 text-sm text-[#29352A] outline-none transition placeholder:text-[#A0A69E] focus:border-[#7EA579] focus:ring-4 focus:ring-[#5F8F59]/10"
             />
 
@@ -134,6 +186,12 @@ function SignInForm({
             </button>
           </div>
         </div>
+
+        {error && (
+          <div className="rounded-xl border border-[#E8CFCB] bg-[#FBF3F1] px-3.5 py-3 text-sm text-[#A24B42]">
+            {error}
+          </div>
+        )}
 
         <div className="flex items-center justify-between">
           <label className="flex cursor-pointer items-center gap-2 text-sm text-[#697067]">
@@ -161,10 +219,12 @@ function SignInForm({
 
         <button
           type="submit"
-          className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#5F8F59] text-sm font-semibold text-white shadow-sm transition hover:bg-[#527E4D]"
+          disabled={isSubmitting}
+          className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#5F8F59] text-sm font-semibold text-white shadow-sm transition hover:bg-[#527E4D] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Sign in to workspace
-          <ArrowRight className="h-4 w-4" />
+          {isSubmitting ? "Signing in..." : "Sign in to workspace"}
+
+          {!isSubmitting && <ArrowRight className="h-4 w-4" />}
         </button>
       </form>
 
@@ -196,11 +256,15 @@ function CreateAccount({
   showPassword,
   setShowPassword,
   onSignIn,
+  registrationData,
+  setRegistrationData,
   onContinue,
 }: {
   showPassword: boolean;
   setShowPassword: React.Dispatch<React.SetStateAction<boolean>>;
   onSignIn: () => void;
+  registrationData: RegistrationData;
+  setRegistrationData: (data: RegistrationData) => void;
   onContinue: () => void;
 }) {
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -230,9 +294,30 @@ function CreateAccount({
 
       <form className="mt-7 space-y-4" onSubmit={handleSubmit}>
         <div className="grid grid-cols-2 gap-3">
-          <Input label="First name" placeholder="John" required />
-
-          <Input label="Last name" placeholder="Doe" required />
+          <Input
+            label="First name"
+            placeholder="John"
+            required
+            value={registrationData.first_name}
+            onChange={(value) =>
+              setRegistrationData({
+                ...registrationData,
+                first_name: value,
+              })
+            }
+          />
+          <Input
+            label="Last name"
+            placeholder="Doe"
+            required
+            value={registrationData.last_name}
+            onChange={(value) =>
+              setRegistrationData({
+                ...registrationData,
+                last_name: value,
+              })
+            }
+          />
         </div>
 
         <Input
@@ -240,6 +325,13 @@ function CreateAccount({
           type="email"
           placeholder="you@company.com"
           required
+          value={registrationData.email}
+          onChange={(value) =>
+            setRegistrationData({
+              ...registrationData,
+              email: value,
+            })
+          }
         />
 
         <div>
@@ -253,6 +345,13 @@ function CreateAccount({
               minLength={8}
               type={showPassword ? "text" : "password"}
               placeholder="Create a password"
+              value={registrationData.password}
+              onChange={(event) =>
+                setRegistrationData({
+                  ...registrationData,
+                  password: event.target.value,
+                })
+              }
               className="h-11 w-full rounded-xl border border-[#DDE2D9] bg-white px-3.5 pr-11 text-sm text-[#29352A] outline-none transition placeholder:text-[#A0A69E] focus:border-[#7EA579] focus:ring-4 focus:ring-[#5F8F59]/10"
             />
 
@@ -313,11 +412,15 @@ function Input({
   placeholder,
   type = "text",
   required = false,
+  value,
+  onChange,
 }: {
   label: string;
   placeholder: string;
   type?: string;
   required?: boolean;
+  value?: string;
+  onChange?: (value: string) => void;
 }) {
   return (
     <div>
@@ -329,6 +432,8 @@ function Input({
         required={required}
         type={type}
         placeholder={placeholder}
+        value={value ?? ""}
+        onChange={(event) => onChange?.(event.target.value)}
         className="h-11 w-full rounded-xl border border-[#DDE2D9] bg-white px-3.5 text-sm text-[#29352A] outline-none transition placeholder:text-[#A0A69E] focus:border-[#7EA579] focus:ring-4 focus:ring-[#5F8F59]/10"
       />
     </div>

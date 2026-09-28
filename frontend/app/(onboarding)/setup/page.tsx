@@ -3,6 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { useRegistration } from "@/features/auth/context/RegistrationContext";
+import { registerAccount } from "@/features/auth/services/authService";
+import { createCompanies } from "@/features/onboarding/services/companyService";
+
 import SetupHeader from "@/features/onboarding/components/SetupHeader";
 import SetupProgress from "@/features/onboarding/components/SetupProgress";
 import SetupIntro from "@/features/onboarding/components/SetupIntro";
@@ -26,6 +30,11 @@ export default function SetupPage() {
   );
 
   const canContinue = workspaceName.trim().length > 0 && companies.length > 0;
+
+  const { registrationData, clearRegistrationData } = useRegistration();
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   const handleAddCompany = () => {
     setEditingCompany(null);
@@ -52,16 +61,74 @@ export default function SetupPage() {
     setEditingCompany(null);
   };
 
-  const handleContinue = () => {
-    if (!canContinue) return;
+  const handleContinue = async () => {
+    if (!canContinue || isSubmitting) return;
 
-    console.log({
-      workspaceName,
-      companies,
-    });
+    const firstCompany = companies[0];
 
-    // Backend integration will come later.
-    router.push("/dashboard");
+    if (!firstCompany) return;
+
+    setIsSubmitting(true);
+    setError("");
+
+    try {
+      // ----------------------------------------
+      // STEP 1
+      // Create account + first company
+      // ----------------------------------------
+
+      const response = await registerAccount({
+        first_name: registrationData.first_name,
+        last_name: registrationData.last_name,
+        email: registrationData.email,
+        password: registrationData.password,
+
+        account_name: workspaceName.trim(),
+
+        company_name: firstCompany.companyName.trim(),
+        industry_type: firstCompany.industry.trim(),
+        employee_size: firstCompany.companySize || null,
+        country: firstCompany.country.trim(),
+      });
+
+      console.log("Registration successful:", response);
+
+      // ----------------------------------------
+      // STEP 2
+      // Create remaining companies
+      // ----------------------------------------
+
+      const remainingCompanies = companies.slice(1).map((company) => ({
+        name: company.companyName.trim(),
+        industry_type: company.industry.trim(),
+        employee_size: company.companySize || null,
+        country: company.country.trim(),
+        code: company.companyCode.trim(),
+      }));
+
+      if (remainingCompanies.length > 0) {
+        const createdCompanies = await createCompanies(remainingCompanies);
+
+        console.log("Additional companies created:", createdCompanies);
+      }
+
+      // ----------------------------------------
+      // STEP 3
+      // Registration complete
+      // ----------------------------------------
+
+      clearRegistrationData();
+
+      router.push("/dashboard");
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Unable to complete account setup.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -91,7 +158,7 @@ export default function SetupPage() {
               type="text"
               value={workspaceName}
               onChange={(event) => setWorkspaceName(event.target.value)}
-              placeholder="e.g. Acme Group"
+              placeholder="e.g. ABC Group"
               className="h-11 w-full rounded-xl border border-[#D9DED7] bg-white px-3.5 text-sm text-[#29352A] outline-none transition placeholder:text-[#A2A9A0] focus:border-[#7EA278] focus:ring-4 focus:ring-[#5F8F59]/10"
             />
 
@@ -160,11 +227,15 @@ export default function SetupPage() {
           <div className="h-10" />
         </div>
       </div>
-
+      {error && (
+        <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
       {/* Fixed Footer */}
       <div className="shrink-0">
         <SetupFooter
-          disabled={!canContinue}
+          disabled={!canContinue || isSubmitting}
           onBack={() => router.push("/login")}
           onContinue={handleContinue}
         />
@@ -172,15 +243,15 @@ export default function SetupPage() {
 
       {/* Company Modal */}
       {isCompanyModalOpen && (
-  <CompanySetupModal
-    company={editingCompany}
-    onClose={() => {
-      setIsCompanyModalOpen(false);
-      setEditingCompany(null);
-    }}
-    onSave={handleSaveCompany}
-  />
-)}
+        <CompanySetupModal
+          company={editingCompany}
+          onClose={() => {
+            setIsCompanyModalOpen(false);
+            setEditingCompany(null);
+          }}
+          onSave={handleSaveCompany}
+        />
+      )}
     </main>
   );
 }

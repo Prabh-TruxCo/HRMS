@@ -44,3 +44,8 @@ class RegisterResponse(BaseModel):
     account_id: int
     company_id: int
     access_token: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str

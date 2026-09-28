@@ -5,6 +5,7 @@ export type CompanySetup = {
   companySize: string;
   country: string;
   logo: File | null;
+  companyCode: string;
   brandColor: string;
 };
 

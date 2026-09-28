@@ -34,3 +34,21 @@ def create_access_token(
         settings.secret_key,
         algorithm="HS256",
     )
+    
+def decode_access_token(token: str) -> int:
+    try:
+        payload = jwt.decode(
+            token,
+            settings.secret_key,
+            algorithms=["HS256"],
+        )
+
+        user_id = payload.get("sub")
+
+        if not user_id:
+            raise ValueError("Invalid authentication token.")
+
+        return int(user_id)
+
+    except (jwt.InvalidTokenError, ValueError, TypeError):
+        raise ValueError("Invalid or expired authentication token.")

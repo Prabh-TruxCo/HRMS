@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
+
 import "./globals.css";
+
+import { RegistrationProvider } from "@/features/auth/context/RegistrationContext";
+import { CompanyProvider } from "@/features/company/context/CompanyContext";
+import { AuthProvider } from "@/features/auth/context/AuthContext";
 
 export const metadata: Metadata = {
   title: "HRMS",
@@ -13,7 +18,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <AuthProvider>
+          <RegistrationProvider>
+            <CompanyProvider>{children}</CompanyProvider>
+          </RegistrationProvider>
+        </AuthProvider>
+      </body>
     </html>
   );
 }

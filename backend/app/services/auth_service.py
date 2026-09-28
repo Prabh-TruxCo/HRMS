@@ -3,7 +3,7 @@ import re
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.security import create_access_token, hash_password
+from app.core.security import create_access_token, hash_password, verify_password
 from app.models.account import Account
 from app.models.company import Company
 from app.models.company_membership import CompanyMembership
@@ -135,3 +135,32 @@ def register_customer(
     except Exception:
         db.rollback()
         raise
+
+
+def login_user(
+    db: Session,
+    email: str,
+    password: str,
+) -> dict:
+    user = db.scalar(select(User).where(User.email == email.strip().lower()))
+
+    if not user:
+        raise ValueError("Invalid email or password.")
+
+    if not user.is_active:
+        raise ValueError("Your account is inactive.")
+
+    if not verify_password(
+        password,
+        user.password_hash,
+    ):
+        raise ValueError("Invalid email or password.")
+
+    access_token = create_access_token(
+        user_id=user.id,
+    )
+
+    return {
+        "user": user,
+        "access_token": access_token,
+    }
