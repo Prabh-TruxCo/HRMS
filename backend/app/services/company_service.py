@@ -12,6 +12,7 @@ from app.models.role import Role
 from app.models.role_permission import RolePermission
 from app.models.user import User
 from app.schemas.company import CompanyCreateRequest, CompanyUpdateRequest
+from app.models.organization_configuration import OrganizationConfiguration
 
 
 def get_user_account(
@@ -76,6 +77,7 @@ def create_companies(
                 industry_type=data.industry_type.strip(),
                 employee_size=data.employee_size,
                 country=data.country.strip(),
+                color=data.color,
             )
 
             db.add(company)
@@ -191,8 +193,82 @@ def update_company(
     company.employee_size = data.employee_size
     company.country = data.country.strip()
     company.timezone = data.timezone.strip()
+    company.color = data.color
+    company.logo = data.logo
 
     db.commit()
     db.refresh(company)
 
     return company
+
+
+def get_company_setup_status(
+    db: Session,
+    user: User,
+    company_id: int,
+) -> dict:
+    company = get_company_for_user(
+        db=db,
+        user_id=user.id,
+        company_id=company_id,
+    )
+
+    # ---------------------------------------------------------
+    # 1. Company Profile
+    # ---------------------------------------------------------
+    profile = bool(
+        company.name
+        and company.code
+        and company.industry_type
+        and company.employee_size
+        and company.country
+        and company.timezone
+    )
+
+    # ---------------------------------------------------------
+    # 2. Company Branding
+    # ---------------------------------------------------------
+    branding = bool(company.logo or company.color)
+
+    # ---------------------------------------------------------
+    # 3. Organization Setup
+    # ---------------------------------------------------------
+    organization_configuration = (
+        db.query(OrganizationConfiguration)
+        .filter(OrganizationConfiguration.company_id == company.id)
+        .first()
+    )
+
+    organization = organization_configuration is not None
+
+    # ---------------------------------------------------------
+    # 4. Workforce Setup
+    # ---------------------------------------------------------
+    # Workforce will be connected when workforce configuration
+    # is implemented.
+    workforce = False
+
+    # ---------------------------------------------------------
+    # Calculate Setup Progress
+    # ---------------------------------------------------------
+    sections = [
+        profile,
+        branding,
+        organization,
+        workforce,
+    ]
+
+    completed_sections = sum(sections)
+    total_sections = len(sections)
+
+    percentage = round((completed_sections / total_sections) * 100)
+
+    return {
+        "profile": profile,
+        "branding": branding,
+        "organization": organization,
+        "workforce": workforce,
+        "completed_sections": completed_sections,
+        "total_sections": total_sections,
+        "percentage": percentage,
+    }

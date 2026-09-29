@@ -11,7 +11,7 @@ import {
 } from "react";
 
 import { useAuth } from "@/features/auth/context/AuthContext";
-
+import { CompanyTheme } from "@/features/company/theme/CompanyTheme";
 import {
   getMyCompanies,
   type CompanyResponse,
@@ -19,10 +19,17 @@ import {
 
 import { getCompanyRoles } from "@/features/company/services/membershipService";
 
+export const DEFAULT_BRAND_COLOR = "#5F8F59";
+
+export function getCompanyBrandColor(color: string | null | undefined): string {
+  return color?.trim() || DEFAULT_BRAND_COLOR;
+}
+
 type CompanyContextValue = {
   companies: CompanyResponse[];
   currentCompany: CompanyResponse | null;
   currentCompanyRoles: string[];
+  brandColor: string;
   isLoading: boolean;
   isRolesLoading: boolean;
   setCurrentCompany: (company: CompanyResponse) => void;
@@ -123,6 +130,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       companies,
       currentCompany,
       currentCompanyRoles,
+      brandColor: getCompanyBrandColor(currentCompany?.color),
       isLoading,
       isRolesLoading,
       setCurrentCompany,
@@ -140,7 +148,9 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <CompanyContext.Provider value={value}>{children}</CompanyContext.Provider>
+    <CompanyContext.Provider value={value}>
+      <CompanyTheme brandColor={value.brandColor}>{children}</CompanyTheme>
+    </CompanyContext.Provider>
   );
 }
 

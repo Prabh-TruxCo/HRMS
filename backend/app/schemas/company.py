@@ -6,7 +6,7 @@ class CompanyCreateRequest(BaseModel):
         min_length=1,
         max_length=200,
     )
-    
+
     code: str = Field(
         min_length=2,
         max_length=10,
@@ -26,6 +26,11 @@ class CompanyCreateRequest(BaseModel):
     country: str = Field(
         default="India",
         max_length=100,
+    )
+    
+    color: str | None = Field(
+        default=None,
+        max_length=20,
     )
 
 
@@ -62,6 +67,8 @@ class CompanyListItem(BaseModel):
     industry_type: str
     employee_size: str | None
     country: str
+    color: str | None
+    logo: str | None
     is_active: bool
 
     model_config = {
@@ -80,6 +87,8 @@ class CompanyUpdateRequest(BaseModel):
     employee_size: str | None = Field(default=None, max_length=50)
     country: str = Field(default="India", max_length=100)
     timezone: str = Field(default="Asia/Kolkata", max_length=100)
+    color: str | None = Field(default=None, max_length=20)
+    logo: str | None = Field(default=None, max_length=500)
 
 
 class CompanyDetailResponse(BaseModel):
@@ -97,3 +106,14 @@ class CompanyDetailResponse(BaseModel):
     is_active: bool
 
     model_config = {"from_attributes": True}
+
+
+class CompanySetupStatusResponse(BaseModel):
+    profile: bool
+    branding: bool
+    organization: bool
+    workforce: bool
+    completed_sections: int
+    total_sections: int
+    percentage: int
+

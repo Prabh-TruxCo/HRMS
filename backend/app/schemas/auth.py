@@ -22,6 +22,12 @@ class RegisterRequest(BaseModel):
         max_length=200,
     )
 
+    company_code: str = Field(
+        min_length=2,
+        max_length=10,
+        pattern=r"^[A-Za-z0-9]+$",
+    )
+
     industry_type: str = Field(
         min_length=1,
         max_length=100,
@@ -35,6 +41,16 @@ class RegisterRequest(BaseModel):
     country: str = Field(
         default="India",
         max_length=100,
+    )
+
+    color: str | None = Field(
+        default=None,
+        max_length=20,
+    )
+
+    logo: str | None = Field(
+        default=None,
+        max_length=500,
     )
 
 

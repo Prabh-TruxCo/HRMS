@@ -1,8 +1,42 @@
 @import "tailwindcss";
-
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
 :root {
   --background: #f3f4f0;
   --foreground: #292b27;
+
+  /* Company theme */
+  --brand-color: #5f8f59;
+  --brand-color-hover: color-mix(
+    in srgb,
+    var(--brand-color),
+    black 12%
+  );
+  --brand-color-soft: color-mix(
+    in srgb,
+    var(--brand-color),
+    white 90%
+  );
+  --brand-color-border: color-mix(
+    in srgb,
+    var(--brand-color),
+    white 65%
+  );
+
+  /* Neutral UI */
+  --surface: #fcfcfa;
+  --surface-muted: #f2f4f0;
+  --border: #e1e5de;
+  --border-muted: #e8ebe5;
+
+  --text-primary: #292b27;
+  --text-secondary: #697169;
+  --text-muted: #9aa198;
 }
 
 * {

@@ -2,7 +2,6 @@
 
 import {
   BarChart3,
-  Building2,
   CalendarDays,
   CheckSquare,
   ClipboardList,
@@ -13,6 +12,7 @@ import {
   Settings,
   Users,
 } from "lucide-react";
+import Image from "next/image";
 
 import { useRouter } from "next/navigation";
 import { logoutAccount } from "@/features/auth/services/logoutService";
@@ -58,7 +58,14 @@ const navigation = [
 export default function DashboardSidebar() {
   const router = useRouter();
   const { setCurrentUser } = useAuth();
-  const { clearCompanyState } = useCompany();
+  const { clearCompanyState, currentCompany } = useCompany();
+  const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+  const logoUrl = currentCompany?.logo
+    ? currentCompany.logo.startsWith("http")
+      ? currentCompany.logo
+      : `${API_URL}${currentCompany.logo}`
+    : null;
   const handleLogout = async () => {
     try {
       await logoutAccount();
@@ -72,19 +79,43 @@ export default function DashboardSidebar() {
   return (
     <aside className="hidden w-[240px] shrink-0 border-r border-[#E1E5DE] bg-[#FCFCFA] lg:flex lg:flex-col">
       {/* Brand */}
-      <div className="flex h-[76px] items-center gap-3 border-b border-[#E8EBE5] px-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#5F8F59] text-white shadow-sm">
-          <Building2 size={18} strokeWidth={2.2} />
+      <div className="flex items-center gap-3 border-b border-[#E8EBE5] px-4 py-4">
+        <div
+          className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg"
+          style={{
+            backgroundColor: logoUrl
+              ? "transparent"
+              : "var(--brand-color-soft)",
+          }}
+        >
+          {logoUrl ? (
+            <Image
+              src={logoUrl}
+              alt={`${currentCompany?.name ?? "Company"} logo`}
+              width={40}
+              height={40}
+              className="h-full w-full object-contain p-1"
+            />
+          ) : (
+            <span
+              className="text-sm font-semibold"
+              style={{ color: "var(--brand-color)" }}
+            >
+              {currentCompany?.name?.slice(0, 2).toUpperCase() ?? "CO"}
+            </span>
+          )}
         </div>
 
-        <div>
-          <p className="text-[15px] font-semibold tracking-[-0.01em] text-[#29352A]">
-            HRMS
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold">
+            {currentCompany?.name ?? "Company"}
           </p>
-          <p className="text-[10px] text-[#899188]">Workforce platform</p>
+
+          <p className="truncate text-xs text-gray-500">
+            {currentCompany?.code ?? ""}
+          </p>
         </div>
       </div>
-
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#9AA198]">
@@ -101,9 +132,16 @@ export default function DashboardSidebar() {
                 type="button"
                 className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-medium transition ${
                   item.active
-                    ? "bg-[#EAF2E7] text-[#4E704A]"
+                    ? "text-[var(--brand-color)]"
                     : "text-[#697169] hover:bg-[#F2F4F0] hover:text-[#414940]"
                 }`}
+                style={
+                  item.active
+                    ? {
+                        backgroundColor: "var(--brand-color-soft)",
+                      }
+                    : undefined
+                }
               >
                 <Icon size={16} strokeWidth={1.9} />
                 {item.label}

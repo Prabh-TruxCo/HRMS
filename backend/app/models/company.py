@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -56,7 +56,7 @@ class Company(Base):
         nullable=False,
         default="Asia/Kolkata",
     )
-    
+
     color: Mapped[str | None] = mapped_column(
         String(20),
         nullable=True,
@@ -84,4 +84,18 @@ class Company(Base):
         default=datetime.utcnow,
         onupdate=datetime.utcnow,
         nullable=False,
+    )
+
+    organization_configuration = relationship(
+        "OrganizationConfiguration",
+        back_populates="company",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+    workforce_configuration = relationship(
+        "WorkforceConfiguration",
+        back_populates="company",
+        uselist=False,
+        cascade="all, delete-orphan",
     )

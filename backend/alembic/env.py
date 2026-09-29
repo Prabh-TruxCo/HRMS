@@ -17,6 +17,8 @@ from app.models.membership_role import MembershipRole
 from app.models.role_permission_scope_assignment import (
     RolePermissionScopeAssignment,
 )
+from app.models.organization_configuration import OrganizationConfiguration
+from app.models.workforce_configuration import WorkforceConfiguration
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

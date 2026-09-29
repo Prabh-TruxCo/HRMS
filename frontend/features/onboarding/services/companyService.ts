@@ -13,6 +13,8 @@ export type CompanyResponse = {
   industry_type: string;
   employee_size: string | null;
   country: string;
+  color: string | null;
+  logo: string | null;
   is_active: boolean;
 };
 

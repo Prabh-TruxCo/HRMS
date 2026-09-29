@@ -1,4 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Response,
+    UploadFile,
+    status,
+)
+
+from pathlib import Path
+from uuid import uuid4
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -20,18 +32,82 @@ router = APIRouter(
     status_code=status.HTTP_201_CREATED,
 )
 def register(
-    data: RegisterRequest,
     response: Response,
+    first_name: str = Form(...),
+    last_name: str | None = Form(None),
+    email: str = Form(...),
+    password: str = Form(...),
+    account_name: str = Form(...),
+    company_name: str = Form(...),
+    company_code: str = Form(...),
+    industry_type: str = Form(...),
+    employee_size: str | None = Form(None),
+    country: str = Form("India"),
+    color: str | None = Form(None),
+    logo: UploadFile | None = File(None),
     db: Session = Depends(get_db),
 ):
     try:
-        result = register_customer(db, data)
+        logo_path = None
+
+        if logo:
+            allowed_types = {
+                "image/png": "png",
+                "image/jpeg": "jpg",
+                "image/webp": "webp",
+                "image/svg+xml": "svg",
+            }
+
+            extension = allowed_types.get(logo.content_type)
+
+            if not extension:
+                raise ValueError(
+                    "Unsupported logo format. " "Please upload PNG, JPG, WEBP, or SVG."
+                )
+
+            logo_content = logo.file.read()
+
+            if len(logo_content) > 2 * 1024 * 1024:
+                raise ValueError("Company logo must be smaller than 2 MB.")
+
+            upload_dir = Path("uploads/companies")
+            upload_dir.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+
+            filename = f"company_registration_" f"{uuid4().hex}.{extension}"
+
+            logo_path = f"/uploads/companies/{filename}"
+
+            file_path = upload_dir / filename
+            file_path.write_bytes(logo_content)
+
+        data = RegisterRequest(
+            first_name=first_name,
+            last_name=last_name,
+            email=email,
+            password=password,
+            account_name=account_name,
+            company_name=company_name,
+            company_code=company_code,
+            industry_type=industry_type,
+            employee_size=employee_size,
+            country=country,
+            color=color,
+            logo=logo_path,
+        )
+
+        result = register_customer(
+            db,
+            data,
+        )
 
         response.set_cookie(
             key="session_token",
             value=result["access_token"],
             httponly=True,
-            secure=False,  # True in production with HTTPS
+            secure=False,
             samesite="lax",
             max_age=60 * 60 * 24,
             path="/",
@@ -43,6 +119,12 @@ def register(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
+        )
+
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to create account.",
         )
 
 

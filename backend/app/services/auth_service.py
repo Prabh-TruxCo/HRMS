@@ -1,4 +1,3 @@
-import re
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -13,19 +12,6 @@ from app.models.role import Role
 from app.models.role_permission import RolePermission
 from app.models.user import User
 from app.schemas.auth import RegisterRequest
-
-
-def generate_company_code(company_name: str) -> str:
-    """
-    Convert a company name into a simple company code.
-
-    Example:
-    "Truxco Technologies" -> "TRUXCO-TECHNOLOGIES"
-    """
-    code = re.sub(r"[^A-Za-z0-9]+", "-", company_name)
-    code = code.strip("-").upper()
-
-    return code[:50]
 
 
 def register_customer(
@@ -65,10 +51,12 @@ def register_customer(
         company = Company(
             account_id=account.id,
             name=data.company_name.strip(),
-            code=generate_company_code(data.company_name),
+            code=data.company_code.strip().upper(),
             industry_type=data.industry_type.strip(),
             employee_size=data.employee_size,
             country=data.country.strip(),
+            color=data.color,
+            logo=data.logo,
         )
 
         db.add(company)

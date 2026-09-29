@@ -1,19 +1,60 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import {
+  ArrowLeft,
+  Building2,
+  ChevronRight,
+  Palette,
+  UsersRound,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import AuthGuard from "@/features/auth/components/AuthGuard";
 import { useCompany } from "@/features/company/context/CompanyContext";
-import {
-  getCompany,
-  updateCompany,
-  type CompanyDetail,
-} from "@/features/company/services/companyService";
-import {
-  COMPANY_SIZES,
-  COUNTRIES,
-  INDUSTRIES,
-} from "@/features/onboarding/constants";
+import CompanyProfileTab from "@/features/company/components/CompanyProfileTab";
+import CompanyBrandingTab from "@/features/company/components/CompanyBrandingTab";
+import CompanyOrganizationTab from "@/features/company/components/CompanyOrganizationTab";
+import CompanyWorkforceTab from "@/features/company/components/CompanyWorkforceTab";
+
+type SettingsTab = "profile" | "branding" | "organization" | "workforce";
+
+type SettingsItem = {
+  id: SettingsTab;
+  label: string;
+  description: string;
+  icon: typeof Building2;
+};
+
+const generalSettings: SettingsItem[] = [
+  {
+    id: "profile",
+    label: "Profile",
+    description: "Company information",
+    icon: Building2,
+  },
+  {
+    id: "branding",
+    label: "Branding",
+    description: "Logo and appearance",
+    icon: Palette,
+  },
+];
+
+const organizationSettings: SettingsItem[] = [
+  {
+    id: "organization",
+    label: "Organization",
+    description: "Structure and hierarchy",
+    icon: Building2,
+  },
+  {
+    id: "workforce",
+    label: "Workforce",
+    description: "Workforce policies",
+    icon: UsersRound,
+  },
+];
 
 export default function CompanySettingsPage() {
   return (
@@ -24,343 +65,222 @@ export default function CompanySettingsPage() {
 }
 
 function CompanySettingsContent() {
-  const { currentCompany, isLoading: isCompanyLoading } = useCompany();
+  const router = useRouter();
+  const { currentCompany } = useCompany();
 
-  const [company, setCompany] = useState<CompanyDetail | null>(null);
+  const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
 
-  const [isLoading, setIsLoading] = useState(true);
+  const allSettings = [...generalSettings, ...organizationSettings];
 
-  const [isSaving, setIsSaving] = useState(false);
-
-  const [message, setMessage] = useState("");
-
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (!currentCompany) {
-      return;
-    }
-
-    let isMounted = true;
-
-    const loadCompany = async () => {
-      try {
-        setIsLoading(true);
-        setError("");
-        setMessage("");
-
-        const result = await getCompany(currentCompany.id);
-
-        if (!isMounted) {
-          return;
-        }
-
-        setCompany(result);
-      } catch (error) {
-        if (!isMounted) {
-          return;
-        }
-
-        setError(
-          error instanceof Error ? error.message : "Unable to load company.",
-        );
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadCompany();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [currentCompany]);
-
-  if (isCompanyLoading) {
-    return <div className="p-6 text-sm text-[#7B8379]">Loading company...</div>;
-  }
-
-  if (!currentCompany) {
-    return (
-      <div className="p-6 text-sm text-[#7B8379]">No company selected.</div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="p-6 text-sm text-[#7B8379]">
-        Loading company settings...
-      </div>
-    );
-  }
-
-  if (!company) {
-    return (
-      <div className="p-6 text-sm text-red-600">
-        {error || "Company could not be loaded."}
-      </div>
-    );
-  }
-
-  const handleChange = (field: keyof CompanyDetail, value: string) => {
-    setCompany((previous) => {
-      if (!previous) {
-        return previous;
-      }
-
-      return {
-        ...previous,
-        [field]: value,
-      };
-    });
-  };
-
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (isSaving) {
-      return;
-    }
-
-    try {
-      setIsSaving(true);
-      setError("");
-      setMessage("");
-
-      const updated = await updateCompany(company.id, {
-        name: company.name.trim(),
-        legal_name: company.legal_name?.trim() || null,
-        industry_type: company.industry_type,
-        employee_size: company.employee_size || null,
-        country: company.country,
-        timezone: company.timezone.trim(),
-      });
-
-      setCompany(updated);
-
-      setMessage("Company profile updated successfully.");
-    } catch (error) {
-      setError(
-        error instanceof Error ? error.message : "Unable to update company.",
-      );
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const activeSetting = allSettings.find((setting) => setting.id === activeTab);
 
   return (
-    <div className="mx-auto max-w-4xl p-6">
-      {/* Page Header */}
-      <div className="mb-8">
-        <p className="text-sm font-medium text-[#5F8F59]">Company Settings</p>
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden px-4 py-4 sm:px-6 lg:px-8">
+      {/* =========================================================
+          PAGE HEADER
+          ========================================================= */}
+      <div className="shrink-0">
+        {/* Back */}
+        <button
+          type="button"
+          onClick={() => router.push("/dashboard")}
+          className="mb-5 inline-flex min-h-10 items-center gap-2 text-sm font-medium text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]"
+        >
+          <ArrowLeft size={17} />
+          Back to Dashboard
+        </button>
 
-        <h1 className="mt-1 text-2xl font-semibold text-[#29352A]">
-          Company Profile
-        </h1>
+        {/* Header */}
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-[var(--brand-color)]">
+              Settings
+            </p>
 
-        <p className="mt-2 text-sm text-[#7B8379]">
-          Manage the basic information for your company.
-        </p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
+              Company Settings
+            </h1>
+
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-secondary)]">
+              Manage your company information, appearance, organizational
+              structure, and workforce configuration.
+            </p>
+          </div>
+
+          {currentCompany && (
+            <div className="flex shrink-0 items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+              <div
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+                style={{
+                  backgroundColor: "var(--brand-color-soft)",
+                  color: "var(--brand-color)",
+                }}
+              >
+                <Building2 size={18} />
+              </div>
+
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-[var(--text-muted)]">
+                  Current company
+                </p>
+
+                <p className="max-w-[220px] truncate text-sm font-semibold text-[var(--text-primary)]">
+                  {currentCompany.name}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Company Form */}
-      <form
-        onSubmit={handleSubmit}
-        className="rounded-2xl border border-[#E2E5DF] bg-white p-6"
-      >
-        <div className="grid gap-6 sm:grid-cols-2">
-          {/* Company Name */}
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[#29352A]">
-              Company Name
-            </label>
+      {/* =========================================================
+          SETTINGS WORKSPACE
+          ========================================================= */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 overflow-hidden lg:grid-cols-[250px_minmax(0,1fr)] xl:grid-cols-[270px_minmax(0,1fr)]">
+        {/* =======================================================
+            LEFT NAVIGATION
+            ======================================================= */}
+        <aside className="h-fit shrink-0 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-2">
+          <SettingsNavigationSection
+            title="General"
+            items={generalSettings}
+            activeTab={activeTab}
+            onSelect={setActiveTab}
+          />
 
-            <input
-              type="text"
-              value={company.name}
-              onChange={(event) => handleChange("name", event.target.value)}
-              required
-              className="w-full rounded-xl border border-[#D9DED6] px-4 py-3 outline-none transition focus:border-[#5F8F59]"
-              placeholder="Enter company name"
-            />
+          <div className="my-2 border-t border-[var(--border)]" />
+
+          <SettingsNavigationSection
+            title="Organization"
+            items={organizationSettings}
+            activeTab={activeTab}
+            onSelect={setActiveTab}
+          />
+        </aside>
+
+        {/* =======================================================
+            RIGHT CONTENT
+            ONLY THIS AREA SCROLLS
+            ======================================================= */}
+        <main className="min-h-0 min-w-0 overflow-y-auto overflow-x-hidden pr-1">
+          {/* Content Header */}
+          {activeSetting && (
+            <div className="mb-5 flex shrink-0 items-center gap-3">
+              {(() => {
+                const Icon = activeSetting.icon;
+
+                return (
+                  <>
+                    <div
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                      style={{
+                        backgroundColor: "var(--brand-color-soft)",
+                        color: "var(--brand-color)",
+                      }}
+                    >
+                      <Icon size={19} />
+                    </div>
+
+                    <div className="min-w-0">
+                      <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                        {activeSetting.label}
+                      </h2>
+
+                      <p className="text-sm text-[var(--text-secondary)]">
+                        {activeSetting.description}
+                      </p>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* =====================================================
+              SETTINGS CONTENT
+              ===================================================== */}
+          <div className="w-full">
+            {activeTab === "profile" && <CompanyProfileTab />}
+
+            {activeTab === "branding" && <CompanyBrandingTab />}
+
+            {activeTab === "organization" && <CompanyOrganizationTab />}
+
+            {activeTab === "workforce" && <CompanyWorkforceTab />}
           </div>
+        </main>
+      </div>
+    </div>
+  );
+}
 
-          {/* Legal Name */}
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[#29352A]">
-              Legal Name
-            </label>
+/* ===============================================================
+   SETTINGS NAVIGATION
+   =============================================================== */
 
-            <input
-              type="text"
-              value={company.legal_name ?? ""}
-              onChange={(event) =>
-                handleChange("legal_name", event.target.value)
-              }
-              className="w-full rounded-xl border border-[#D9DED6] px-4 py-3 outline-none transition focus:border-[#5F8F59]"
-              placeholder="Enter legal company name"
-            />
-          </div>
+function SettingsNavigationSection({
+  title,
+  items,
+  activeTab,
+  onSelect,
+}: {
+  title: string;
+  items: SettingsItem[];
+  activeTab: SettingsTab;
+  onSelect: (id: SettingsTab) => void;
+}) {
+  return (
+    <div>
+      <p className="px-3 pb-2 pt-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+        {title}
+      </p>
 
-          {/* Company Code */}
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[#29352A]">
-              Company Code
-            </label>
+      <div className="space-y-1">
+        {items.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeTab === item.id;
 
-            <input
-              type="text"
-              value={company.code}
-              disabled
-              className="w-full rounded-xl border border-[#E3E6E0] bg-[#F5F6F3] px-4 py-3 text-[#7B8379]"
-            />
-
-            <p className="mt-1 text-xs text-[#9AA197]">
-              Company code cannot be changed.
-            </p>
-          </div>
-
-          {/* Industry */}
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[#29352A]">
-              Industry
-            </label>
-
-            <select
-              value={company.industry_type}
-              onChange={(event) =>
-                handleChange("industry_type", event.target.value)
-              }
-              required
-              className="w-full rounded-xl border border-[#D9DED6] bg-white px-4 py-3 outline-none transition focus:border-[#5F8F59]"
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => onSelect(item.id)}
+              className={`group flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition ${
+                isActive
+                  ? "bg-[var(--brand-color-soft)] text-[var(--brand-color)]"
+                  : "text-[var(--text-secondary)] hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]"
+              }`}
             >
-              <option value="">Select industry</option>
+              <Icon size={17} className="shrink-0" />
 
-              {INDUSTRIES.map((industry) => (
-                <option key={industry} value={industry}>
-                  {industry}
-                </option>
-              ))}
-            </select>
-          </div>
+              <span className="min-w-0 flex-1">
+                <span
+                  className={`block text-sm font-medium ${
+                    isActive
+                      ? "text-[var(--brand-color)]"
+                      : "text-[var(--text-primary)]"
+                  }`}
+                >
+                  {item.label}
+                </span>
 
-          {/* Employee Size */}
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[#29352A]">
-              Employee Size
-            </label>
+                <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">
+                  {item.description}
+                </span>
+              </span>
 
-            <select
-              value={company.employee_size ?? ""}
-              onChange={(event) =>
-                handleChange("employee_size", event.target.value)
-              }
-              className="w-full rounded-xl border border-[#D9DED6] bg-white px-4 py-3 outline-none transition focus:border-[#5F8F59]"
-            >
-              <option value="">Select employee size</option>
-
-              {COMPANY_SIZES.map((size) => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Country */}
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[#29352A]">
-              Country
-            </label>
-
-            <select
-              value={company.country}
-              onChange={(event) => handleChange("country", event.target.value)}
-              required
-              className="w-full rounded-xl border border-[#D9DED6] bg-white px-4 py-3 outline-none transition focus:border-[#5F8F59]"
-            >
-              <option value="">Select country</option>
-
-              {COUNTRIES.map((country) => (
-                <option key={country} value={country}>
-                  {country}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Timezone */}
-          <div className="sm:col-span-2">
-            <label className="mb-2 block text-sm font-medium text-[#29352A]">
-              Timezone
-            </label>
-
-            <select
-              value={company.timezone}
-              onChange={(event) => handleChange("timezone", event.target.value)}
-              required
-              className="w-full rounded-xl border border-[#D9DED6] bg-white px-4 py-3 outline-none transition focus:border-[#5F8F59]"
-            >
-              <option value="Asia/Kolkata">India — Asia/Kolkata</option>
-
-              <option value="America/New_York">
-                United States — Eastern Time
-              </option>
-
-              <option value="America/Chicago">
-                United States — Central Time
-              </option>
-
-              <option value="America/Denver">
-                United States — Mountain Time
-              </option>
-
-              <option value="America/Los_Angeles">
-                United States — Pacific Time
-              </option>
-
-              <option value="Europe/London">United Kingdom — London</option>
-
-              <option value="Australia/Sydney">Australia — Sydney</option>
-
-              <option value="Asia/Dubai">UAE — Dubai</option>
-
-              <option value="Asia/Singapore">Singapore — Singapore</option>
-            </select>
-
-            <p className="mt-1 text-xs text-[#9AA197]">
-              This timezone will be used for company attendance and date/time
-              calculations.
-            </p>
-          </div>
-        </div>
-
-        {/* Messages */}
-        {error && (
-          <div className="mt-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
-            {error}
-          </div>
-        )}
-
-        {message && (
-          <div className="mt-5 rounded-xl border border-[#DCE9D8] bg-[#EEF3EA] px-4 py-3 text-sm text-[#5F8F59]">
-            {message}
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="mt-8 flex justify-end">
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="rounded-xl bg-[#5F8F59] px-5 py-3 text-sm font-medium text-white transition hover:bg-[#527D4D] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isSaving ? "Saving..." : "Save Changes"}
-          </button>
-        </div>
-      </form>
+              <ChevronRight
+                size={15}
+                className={`shrink-0 transition ${
+                  isActive
+                    ? "text-[var(--brand-color)]"
+                    : "text-[var(--text-muted)] opacity-0 group-hover:opacity-100"
+                }`}
+              />
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
