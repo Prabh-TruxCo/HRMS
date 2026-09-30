@@ -13,6 +13,7 @@ from app.models.role_permission import RolePermission
 from app.models.user import User
 from app.schemas.company import CompanyCreateRequest, CompanyUpdateRequest
 from app.models.organization_configuration import OrganizationConfiguration
+from app.models.workforce_configuration import WorkforceConfiguration
 
 
 def get_user_account(
@@ -244,9 +245,13 @@ def get_company_setup_status(
     # ---------------------------------------------------------
     # 4. Workforce Setup
     # ---------------------------------------------------------
-    # Workforce will be connected when workforce configuration
-    # is implemented.
-    workforce = False
+    workforce_configuration = (
+        db.query(WorkforceConfiguration)
+        .filter(WorkforceConfiguration.company_id == company.id)
+        .first()
+    )
+
+    workforce = workforce_configuration is not None
 
     # ---------------------------------------------------------
     # Calculate Setup Progress

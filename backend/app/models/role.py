@@ -48,3 +48,4 @@ class Role(Base):
         onupdate=datetime.utcnow,
         nullable=False,
     )
+    

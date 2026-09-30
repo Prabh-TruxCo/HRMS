@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, ForeignKey, Integer, String
+from sqlalchemy import Boolean, ForeignKey, Integer, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -7,10 +7,7 @@ from app.db.base import Base
 class WorkforceConfiguration(Base):
     __tablename__ = "workforce_configurations"
 
-    id: Mapped[int] = mapped_column(
-        Integer,
-        primary_key=True,
-    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
     company_id: Mapped[int] = mapped_column(
         ForeignKey("companies.id", ondelete="CASCADE"),
@@ -18,22 +15,23 @@ class WorkforceConfiguration(Base):
         unique=True,
     )
 
-    attendance_mode: Mapped[str] = mapped_column(
-        String(30),
+    setup_mode: Mapped[str] = mapped_column(
+        String(20),
         nullable=False,
-        default="manual",
+        default="recommended",
     )
 
-    shifts_enabled: Mapped[bool] = mapped_column(
+    # Attendance
+    attendance_enabled: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
-        default=False,
+        default=True,
     )
 
-    overtime_enabled: Mapped[bool] = mapped_column(
-        Boolean,
+    attendance_methods: Mapped[list[str]] = mapped_column(
+        JSON,
         nullable=False,
-        default=False,
+        default=list,
     )
 
     late_marking_enabled: Mapped[bool] = mapped_column(
@@ -46,6 +44,75 @@ class WorkforceConfiguration(Base):
         Integer,
         nullable=False,
         default=10,
+    )
+
+    early_checkout_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+
+    auto_markout_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+
+    attendance_regularization_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    attendance_approval_required: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+
+    # Working schedule
+    shifts_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+
+    # Overtime
+    overtime_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+
+    overtime_approval_required: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    # Remote / field work
+    remote_work_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+
+    field_work_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+
+    gps_attendance_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+
+    geofencing_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
     )
 
     company = relationship(

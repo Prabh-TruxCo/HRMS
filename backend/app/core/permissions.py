@@ -26,7 +26,6 @@ PERMISSIONS = [
         "description": "Allows deleting employee records.",
         "module": "EMPLOYEE",
     },
-
     # =========================
     # Attendance
     # =========================
@@ -54,7 +53,6 @@ PERMISSIONS = [
         "description": "Allows approving attendance changes or corrections.",
         "module": "ATTENDANCE",
     },
-
     # =========================
     # Leave
     # =========================
@@ -82,7 +80,6 @@ PERMISSIONS = [
         "description": "Allows approving or rejecting leave requests.",
         "module": "LEAVE",
     },
-
     # =========================
     # Tasks
     # =========================
@@ -110,7 +107,6 @@ PERMISSIONS = [
         "description": "Allows deleting tasks.",
         "module": "TASK",
     },
-
     # =========================
     # Tickets
     # =========================
@@ -138,7 +134,6 @@ PERMISSIONS = [
         "description": "Allows deleting tickets.",
         "module": "TICKET",
     },
-
     # =========================
     # Reports
     # =========================
@@ -154,7 +149,6 @@ PERMISSIONS = [
         "description": "Allows exporting reports.",
         "module": "REPORT",
     },
-
     # =========================
     # Payroll
     # =========================
@@ -175,5 +169,131 @@ PERMISSIONS = [
         "name": "View Payslips",
         "description": "Allows viewing employee payslips.",
         "module": "PAYROLL",
+    },
+    # =========================
+    # Assets
+    # =========================
+    {
+        "code": "ASSET_VIEW",
+        "name": "View Assets",
+        "description": "Allows viewing company assets.",
+        "module": "ASSET",
+    },
+    {
+        "code": "ASSET_CREATE",
+        "name": "Create Assets",
+        "description": "Allows creating company assets.",
+        "module": "ASSET",
+    },
+    {
+        "code": "ASSET_UPDATE",
+        "name": "Update Assets",
+        "description": "Allows updating asset information.",
+        "module": "ASSET",
+    },
+    {
+        "code": "ASSET_DELETE",
+        "name": "Delete Assets",
+        "description": "Allows deleting company assets.",
+        "module": "ASSET",
+    },
+    {
+        "code": "ASSET_ASSIGN",
+        "name": "Assign Assets",
+        "description": "Allows assigning assets to employees.",
+        "module": "ASSET",
+    },
+    # =========================
+    # Company
+    # =========================
+    {
+        "code": "COMPANY_VIEW",
+        "name": "View Company",
+        "description": "Allows viewing company information.",
+        "module": "COMPANY",
+    },
+    {
+        "code": "COMPANY_UPDATE",
+        "name": "Update Company",
+        "description": "Allows updating company information.",
+        "module": "COMPANY",
+    },
+    # =========================
+    # Company Branding
+    # =========================
+    {
+        "code": "COMPANY_BRANDING_VIEW",
+        "name": "View Company Branding",
+        "description": "Allows viewing company branding settings.",
+        "module": "COMPANY_BRANDING",
+    },
+    {
+        "code": "COMPANY_BRANDING_UPDATE",
+        "name": "Update Company Branding",
+        "description": "Allows updating company branding settings.",
+        "module": "COMPANY_BRANDING",
+    },
+    # =========================
+    # Organization
+    # =========================
+    {
+        "code": "ORGANIZATION_VIEW",
+        "name": "View Organization Settings",
+        "description": "Allows viewing company organization settings.",
+        "module": "ORGANIZATION",
+    },
+    {
+        "code": "ORGANIZATION_UPDATE",
+        "name": "Update Organization Settings",
+        "description": "Allows updating company organization settings.",
+        "module": "ORGANIZATION",
+    },
+    # =========================
+    # Workforce
+    # =========================
+    {
+        "code": "WORKFORCE_VIEW",
+        "name": "View Workforce Settings",
+        "description": "Allows viewing workforce configuration.",
+        "module": "WORKFORCE",
+    },
+    {
+        "code": "WORKFORCE_UPDATE",
+        "name": "Update Workforce Settings",
+        "description": "Allows updating workforce configuration.",
+        "module": "WORKFORCE",
+    },
+    # =========================
+    # Roles & Permissions
+    # =========================
+    {
+        "code": "ROLE_VIEW",
+        "name": "View Roles",
+        "description": "Allows viewing company roles and permissions.",
+        "module": "ROLE",
+    },
+    {
+        "code": "ROLE_CREATE",
+        "name": "Create Roles",
+        "description": "Allows creating company roles.",
+        "module": "ROLE",
+    },
+    {
+        "code": "ROLE_UPDATE",
+        "name": "Update Roles",
+        "description": "Allows updating company roles and permissions.",
+        "module": "ROLE",
+    },
+    {
+        "code": "ROLE_DELETE",
+        "name": "Delete Roles",
+        "description": "Allows deleting company roles.",
+        "module": "ROLE",
+    },
+    {
+        "code": "ROLE_ASSIGN",
+        "name": "Assign Roles",
+        "description": "Allows assigning roles to company members.",
+        "module": "ROLE",
     },
 ]
