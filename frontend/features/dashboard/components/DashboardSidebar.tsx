@@ -156,6 +156,7 @@ export default function DashboardSidebar() {
 
         <button
           type="button"
+          onClick={() => router.push("/settings/company")}
           className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[12px] font-medium text-[#697169] transition hover:bg-[#F2F4F0] hover:text-[#414940]"
         >
           <Settings size={16} strokeWidth={1.9} />
