@@ -1,4 +1,15 @@
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict
+
+ScopeCode = Literal[
+    "COMPANY",
+    "BRANCH",
+    "DEPARTMENT",
+    "TEAM",
+    "ASSIGNED_SITE",
+    "SELF",
+]
 
 
 class RolePermissionResponse(BaseModel):
@@ -38,7 +49,8 @@ class RoleDetailResponse(BaseModel):
 
 class RoleListResponse(BaseModel):
     roles: list[RoleListItem]
-    
+
+
 class RoleCreateRequest(BaseModel):
     name: str
     description: str | None = None
@@ -48,4 +60,13 @@ class RoleCreateRequest(BaseModel):
 class RoleUpdateRequest(BaseModel):
     name: str
     description: str | None = None
-    is_active: bool    
+    is_active: bool
+
+
+class RolePermissionRequest(BaseModel):
+    permission_code: str
+    scope: ScopeCode
+
+
+class RolePermissionsUpdateRequest(BaseModel):
+    permissions: list[RolePermissionRequest]

@@ -8,13 +8,19 @@ from app.schemas.role import (
     RoleCreateRequest,
     RoleDetailResponse,
     RoleListResponse,
+    RolePermissionsUpdateRequest,
+    RoleUpdateRequest,
 )
+
 from app.services.role_service import (
     create_role,
     get_company_roles,
     get_role_by_id,
     get_role_permissions,
     is_system_role,
+    update_role_permissions,
+    update_role,
+    delete_role,
 )
 from app.services.company_service import get_company_for_user
 
@@ -135,3 +141,155 @@ def create_company_role(
         "is_system_role": False,
         "permissions": [],
     }
+
+
+@router.put(
+    "/{role_id}/permissions",
+    response_model=RoleDetailResponse,
+)
+def update_role_permissions_endpoint(
+    company_id: int,
+    role_id: int,
+    payload: RolePermissionsUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    get_company_for_user(
+        db=db,
+        user_id=current_user.id,
+        company_id=company_id,
+    )
+
+    try:
+        role = update_role_permissions(
+            db=db,
+            company_id=company_id,
+            role_id=role_id,
+            permissions=[
+                {
+                    "permission_code": item.permission_code,
+                    "scope": item.scope,
+                }
+                for item in payload.permissions
+            ],
+        )
+
+    except ValueError as exc:
+        message = str(exc)
+
+        if message == "Role not found.":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=message,
+            )
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=message,
+        )
+
+    permissions = get_role_permissions(
+        db=db,
+        role_id=role.id,
+    )
+
+    return {
+        "id": role.id,
+        "company_id": role.company_id,
+        "name": role.name,
+        "description": role.description,
+        "is_active": role.is_active,
+        "is_system_role": is_system_role(role.name),
+        "permissions": permissions,
+    }
+
+@router.put(
+    "/{role_id}",
+    response_model=RoleDetailResponse,
+)
+def update_company_role(
+    company_id: int,
+    role_id: int,
+    payload: RoleUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    get_company_for_user(
+        db=db,
+        user_id=current_user.id,
+        company_id=company_id,
+    )
+
+    try:
+        role = update_role(
+            db=db,
+            company_id=company_id,
+            role_id=role_id,
+            name=payload.name,
+            description=payload.description,
+            is_active=payload.is_active,
+        )
+    except ValueError as exc:
+        message = str(exc)
+
+        if message == "Role not found.":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=message,
+            )
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=message,
+        )
+
+    return {
+        "id": role.id,
+        "company_id": role.company_id,
+        "name": role.name,
+        "description": role.description,
+        "is_active": role.is_active,
+        "is_system_role": is_system_role(role.name),
+        "permissions": get_role_permissions(
+            db=db,
+            role_id=role.id,
+        ),
+    }
+
+@router.delete(
+    "/{role_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_company_role(
+    company_id: int,
+    role_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    get_company_for_user(
+        db=db,
+        user_id=current_user.id,
+        company_id=company_id,
+    )
+
+    try:
+        delete_role(
+            db=db,
+            company_id=company_id,
+            role_id=role_id,
+        )
+    except ValueError as exc:
+        message = str(exc)
+
+        if message == "Role not found.":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=message,
+            )
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=message,
+        )
+
+    return None

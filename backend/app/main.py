@@ -7,6 +7,10 @@ from app.api.membership import router as membership_router
 from app.api.workforce import router as workforce_router
 from app.api.employment import router as employment_router
 from app.api.roles import router as roles_router
+from app.api.member_roles import router as member_roles_router
+from app.api.permissions import router as permissions_router
+from app.api.branches import router as branches_router
+
 from pathlib import Path
 
 from fastapi.staticfiles import StaticFiles
@@ -37,7 +41,9 @@ app.include_router(membership_router)
 app.include_router(workforce_router)
 app.include_router(employment_router)
 app.include_router(roles_router)
-
+app.include_router(member_roles_router)
+app.include_router(permissions_router)
+app.include_router(branches_router)
 
 @app.get("/")
 def root():

@@ -6,6 +6,7 @@ import {
   Building2,
   ChevronRight,
   Palette,
+  ShieldCheck,
   UsersRound,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -16,8 +17,14 @@ import CompanyProfileTab from "@/features/company/components/CompanyProfileTab";
 import CompanyBrandingTab from "@/features/company/components/CompanyBrandingTab";
 import CompanyOrganizationTab from "@/features/company/components/CompanyOrganizationTab";
 import CompanyWorkforceTab from "@/features/company/components/CompanyWorkforceTab";
+import CompanyRolesTab from "@/features/company/components/CompanyRolesTab";
 
-type SettingsTab = "profile" | "branding" | "organization" | "workforce";
+type SettingsTab =
+  | "profile"
+  | "branding"
+  | "organization"
+  | "workforce"
+  | "roles";
 
 type SettingsItem = {
   id: SettingsTab;
@@ -54,6 +61,12 @@ const organizationSettings: SettingsItem[] = [
     description: "Workforce policies",
     icon: UsersRound,
   },
+  {
+    id: "roles",
+    label: "Roles & Permissions",
+    description: "Access and responsibilities",
+    icon: ShieldCheck,
+  },
 ];
 
 export default function CompanySettingsPage() {
@@ -76,11 +89,7 @@ function CompanySettingsContent() {
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden px-4 py-4 sm:px-6 lg:px-8">
-      {/* =========================================================
-          PAGE HEADER
-          ========================================================= */}
       <div className="shrink-0">
-        {/* Back */}
         <button
           type="button"
           onClick={() => router.push("/dashboard")}
@@ -90,7 +99,6 @@ function CompanySettingsContent() {
           Back to Dashboard
         </button>
 
-        {/* Header */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-[var(--brand-color)]">
@@ -103,7 +111,7 @@ function CompanySettingsContent() {
 
             <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-secondary)]">
               Manage your company information, appearance, organizational
-              structure, and workforce configuration.
+              structure, workforce configuration, and access control.
             </p>
           </div>
 
@@ -133,13 +141,7 @@ function CompanySettingsContent() {
         </div>
       </div>
 
-      {/* =========================================================
-          SETTINGS WORKSPACE
-          ========================================================= */}
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 overflow-hidden lg:grid-cols-[250px_minmax(0,1fr)] xl:grid-cols-[270px_minmax(0,1fr)]">
-        {/* =======================================================
-            LEFT NAVIGATION
-            ======================================================= */}
         <aside className="h-fit shrink-0 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-2">
           <SettingsNavigationSection
             title="General"
@@ -158,12 +160,7 @@ function CompanySettingsContent() {
           />
         </aside>
 
-        {/* =======================================================
-            RIGHT CONTENT
-            ONLY THIS AREA SCROLLS
-            ======================================================= */}
         <main className="min-h-0 min-w-0 overflow-y-auto overflow-x-hidden pr-1">
-          {/* Content Header */}
           {activeSetting && (
             <div className="mb-5 flex shrink-0 items-center gap-3">
               {(() => {
@@ -196,9 +193,6 @@ function CompanySettingsContent() {
             </div>
           )}
 
-          {/* =====================================================
-              SETTINGS CONTENT
-              ===================================================== */}
           <div className="w-full">
             {activeTab === "profile" && <CompanyProfileTab />}
 
@@ -207,16 +201,14 @@ function CompanySettingsContent() {
             {activeTab === "organization" && <CompanyOrganizationTab />}
 
             {activeTab === "workforce" && <CompanyWorkforceTab />}
+
+            {activeTab === "roles" && <CompanyRolesTab />}
           </div>
         </main>
       </div>
     </div>
   );
 }
-
-/* ===============================================================
-   SETTINGS NAVIGATION
-   =============================================================== */
 
 function SettingsNavigationSection({
   title,
