@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 
 import { useCompany } from "../context/CompanyContext";
+import { useSnackbar } from "@/components/feedback/SnackbarProvider";
 
 import {
   createBranch,
-  deleteBranch,
   getBranches,
   updateBranch,
   type Branch,
@@ -49,7 +49,7 @@ export default function BranchManagement() {
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
 
   const [form, setForm] = useState<BranchForm>(EMPTY_FORM);
-
+  const { showSuccess, showError } = useSnackbar();
   useEffect(() => {
     if (companyId === null) {
       return;
@@ -169,48 +169,26 @@ export default function BranchManagement() {
             .map((branch) => (branch.id === updated.id ? updated : branch))
             .sort((a, b) => a.name.localeCompare(b.name)),
         );
+        showSuccess("Branch updated successfully.");
       } else {
         const created = await createBranch(activeCompanyId, payload);
 
         setBranches((current) =>
           [...current, created].sort((a, b) => a.name.localeCompare(b.name)),
         );
+        showSuccess("Branch created successfully.");
       }
-
       setShowModal(false);
       setEditingBranch(null);
       setForm(EMPTY_FORM);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to save branch.");
+      const message =
+        err instanceof Error ? err.message : "Unable to save branch.";
+
+      setError(message);
+      showError(message);
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function handleDelete(branch: Branch) {
-    if (companyId === null) {
-      setError("No company is currently selected.");
-      return;
-    }
-
-    const activeCompanyId: number = companyId;
-
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${branch.name}"?`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      setError(null);
-
-      await deleteBranch(activeCompanyId, branch.id);
-
-      setBranches((current) => current.filter((item) => item.id !== branch.id));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to delete branch.");
     }
   }
 
@@ -364,14 +342,6 @@ export default function BranchManagement() {
                             className="rounded-md border border-[var(--border)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-primary)] transition hover:bg-[var(--surface-muted)]"
                           >
                             Edit
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => void handleDelete(branch)}
-                            className="rounded-md border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50"
-                          >
-                            Delete
                           </button>
                         </div>
                       </td>

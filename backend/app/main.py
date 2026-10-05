@@ -10,6 +10,8 @@ from app.api.roles import router as roles_router
 from app.api.member_roles import router as member_roles_router
 from app.api.permissions import router as permissions_router
 from app.api.branches import router as branches_router
+from app.api.departments import router as departments_router
+from app.api.audit_logs import router as audit_logs_router
 
 from pathlib import Path
 
@@ -44,6 +46,9 @@ app.include_router(roles_router)
 app.include_router(member_roles_router)
 app.include_router(permissions_router)
 app.include_router(branches_router)
+app.include_router(departments_router)
+app.include_router(audit_logs_router)
+
 
 @app.get("/")
 def root():

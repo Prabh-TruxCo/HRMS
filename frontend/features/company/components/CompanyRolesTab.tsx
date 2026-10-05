@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSnackbar } from "@/components/feedback/SnackbarProvider";
 
 import {
   createRole,
@@ -56,7 +57,7 @@ export default function CompanyRolesTab() {
   const [editingRole, setEditingRole] = useState<Role | null>(null);
 
   const [roleForm, setRoleForm] = useState<RoleFormState>(EMPTY_ROLE_FORM);
-
+  const { showSuccess, showError } = useSnackbar();
   /*
    * Load roles + permission catalog whenever the selected company changes.
    *
@@ -254,12 +255,16 @@ export default function CompanyRolesTab() {
           description: roleForm.description.trim() || null,
           is_active: roleForm.is_active,
         });
+
+        showSuccess("Role updated successfully.");
       } else {
         await createRole(companyId, {
           name,
           description: roleForm.description.trim() || null,
           is_active: roleForm.is_active,
         });
+
+        showSuccess("Role created successfully.");
       }
 
       const updatedRoles = await getCompanyRoles(companyId);
@@ -285,7 +290,11 @@ export default function CompanyRolesTab() {
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to save role.");
+      const message =
+        err instanceof Error ? err.message : "Unable to save role.";
+
+      setError(message);
+      showError(message);
     } finally {
       setSavingRole(false);
     }
@@ -327,8 +336,13 @@ export default function CompanyRolesTab() {
         updatedRoles.find((item) => item.id !== role.id) ?? updatedRoles[0];
 
       await loadRole(companyId, nextRole.id);
+      showSuccess("Role deleted successfully.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to delete role.");
+      showError(
+        "Unable to delete role, " +
+          (err instanceof Error ? err.message : "Unknown error"),
+      );
     } finally {
       setDeletingRole(false);
     }

@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.db.base import Base
 from app.models.user import User
 from app.models.account import Account
+from app.models.audit_log import AuditLog
 from app.models.company import Company
 from app.models.company_membership import CompanyMembership
 from app.models.permission import Permission
@@ -21,6 +22,7 @@ from app.models.organization_configuration import OrganizationConfiguration
 from app.models.workforce_configuration import WorkforceConfiguration
 from app.models.employment_type import EmploymentType
 from app.models.branch import Branch
+from app.models.department import Department
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

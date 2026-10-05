@@ -53,6 +53,7 @@ const NAV: NavSection[] = [
         children: [
           { label: "Overview", href: "/organization", exact: true },
           { label: "Branches", href: "/organization/branches" },
+          { label: "Departments", href: "/organization/departments" },
         ],
       },
       {
@@ -79,14 +80,30 @@ const NAV: NavSection[] = [
   },
   {
     title: "Administration",
-    items: [{ label: "Company settings", href: "/settings", icon: Settings }],
+    items: [
+      { label: "Company settings", href: "/settings/company", icon: Settings },
+    ],
   },
 ];
 
+/* ---------- shared styles ---------- */
+
 const ROW =
-  "group relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[12.5px] leading-5 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] focus-visible:ring-offset-1";
-const ROW_IDLE = "text-[#5F685E] hover:bg-[#F1F3EE] hover:text-[#2B312A]";
-const ROW_ACTIVE = "bg-[var(--brand-color-soft)] text-[var(--brand-color)]";
+  "group relative flex w-full items-center gap-3 rounded-xl px-2 py-1.5 text-[12.5px] leading-5 font-medium transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FBFBF9]";
+
+// The one loud moment: the current page is a solid brand-colored pill.
+const ROW_CURRENT =
+  "bg-[var(--brand-color)] text-white shadow-[0_6px_14px_-6px_var(--brand-color)]";
+// A parent whose child is the current page: tinted, quieter.
+const ROW_TRAIL = "bg-[var(--brand-color-soft)] text-[var(--brand-color)]";
+const ROW_IDLE = "text-[#566055] hover:bg-[#F0F2ED] hover:text-[#1F251E]";
+
+const TILE =
+  "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors duration-150 motion-reduce:transition-none";
+const TILE_CURRENT = "bg-white/20 text-white";
+const TILE_TRAIL = "bg-white text-[var(--brand-color)]";
+const TILE_IDLE =
+  "bg-white text-[#6B746A] ring-1 ring-[#E4E8E1] group-hover:text-[#1F251E]";
 
 export default function DashboardSidebar() {
   const router = useRouter();
@@ -129,81 +146,77 @@ export default function DashboardSidebar() {
   };
 
   return (
-    <aside className="hidden w-[232px] shrink-0 flex-col border-r border-[#E4E8E1] bg-[#FBFBF9] lg:flex">
+    <aside className="hidden w-[248px] shrink-0 flex-col border-r border-[#E4E8E1] bg-[#FBFBF9] lg:flex">
       {/* Brand */}
-      <div className="flex items-center gap-3 px-5 py-5">
-        <div
-          className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl ring-1 ring-black/5"
-          style={{
-            backgroundColor: logoUrl ? "#fff" : "var(--brand-color-soft)",
-          }}
-        >
-          {logoUrl ? (
-            <Image
-              src={logoUrl}
-              alt={`${currentCompany?.name ?? "Company"} logo`}
-              width={40}
-              height={40}
-              className="h-full w-full object-contain p-1"
-            />
-          ) : (
-            <span
-              className="text-sm font-semibold"
-              style={{ color: "var(--brand-color)" }}
-            >
-              {currentCompany?.name?.slice(0, 2).toUpperCase() ?? "CO"}
-            </span>
-          )}
-        </div>
+      <div className="p-3">
+        <div className="flex items-center gap-3 rounded-2xl border border-[#E4E8E1] bg-white p-2.5 shadow-[0_1px_2px_rgba(31,37,30,0.04)]">
+          <div
+            className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl ring-1 ring-black/5"
+            style={{
+              backgroundColor: logoUrl ? "#fff" : "var(--brand-color-soft)",
+            }}
+          >
+            {logoUrl ? (
+              <Image
+                src={logoUrl}
+                alt={`${currentCompany?.name ?? "Company"} logo`}
+                width={40}
+                height={40}
+                className="h-full w-full object-contain p-1"
+              />
+            ) : (
+              <span
+                className="text-sm font-semibold"
+                style={{ color: "var(--brand-color)" }}
+              >
+                {currentCompany?.name?.slice(0, 2).toUpperCase() ?? "CO"}
+              </span>
+            )}
+          </div>
 
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-[#1F251E]">
-            {currentCompany?.name ?? "Company"}
-          </p>
-          {currentCompany?.code && (
-            <p className="truncate text-xs text-[#8A9288]">
-              {currentCompany.code}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-[#1F251E]">
+              {currentCompany?.name ?? "Company"}
             </p>
-          )}
+            {currentCompany?.code && (
+              <p className="truncate text-xs text-[#8A9288]">
+                {currentCompany.code}
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Navigation */}
       <nav
         aria-label="Main"
-        className="flex-1 space-y-5 overflow-y-auto px-3 pb-4 pt-1"
+        className="flex-1 space-y-6 overflow-y-auto px-3 pb-4 pt-2 [scrollbar-width:thin]"
       >
         {NAV.map((section) => (
           <div key={section.title}>
-            <p className="mb-1.5 px-3 text-xs font-medium text-[#8A9288]">
+            <p className="mb-2 px-2 text-xs font-semibold text-[#8A9288]">
               {section.title}
             </p>
 
-            <ul className="space-y-0.5">
+            <ul className="space-y-1">
               {section.items.map((item) => {
                 const Icon = item.icon;
                 const active = matches(item.href, item.exact);
 
+                /* ---- single link ---- */
                 if (!item.children) {
                   return (
                     <li key={item.href}>
                       <Link
                         href={item.href}
                         aria-current={active ? "page" : undefined}
-                        className={`${ROW} ${active ? ROW_ACTIVE : ROW_IDLE}`}
+                        className={`${ROW} ${active ? ROW_CURRENT : ROW_IDLE}`}
                       >
-                        {active && (
-                          <span
-                            aria-hidden
-                            className="absolute -left-3 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full"
-                            style={{ backgroundColor: "var(--brand-color)" }}
-                          />
-                        )}
-                        <Icon
-                          size={16}
-                          strokeWidth={1.8}
-                          className="shrink-0"
-                        />
+                        <span
+                          className={`${TILE} ${active ? TILE_CURRENT : TILE_IDLE}`}
+                        >
+                          <Icon size={15} strokeWidth={1.9} />
+                        </span>
                         <span className="truncate text-[12.5px] leading-5">
                           {item.label}
                         </span>
@@ -212,6 +225,7 @@ export default function DashboardSidebar() {
                   );
                 }
 
+                /* ---- expandable group ---- */
                 const expanded = !!open[item.href];
 
                 return (
@@ -223,54 +237,74 @@ export default function DashboardSidebar() {
                         setOpen((p) => ({ ...p, [item.href]: !p[item.href] }))
                       }
                       className={`${ROW} justify-between !text-[12.5px] !font-medium ${
-                        active && !expanded
-                          ? ROW_ACTIVE
-                          : active
-                            ? "text-[var(--brand-color)]"
-                            : ROW_IDLE
+                        active ? ROW_TRAIL : ROW_IDLE
                       }`}
                     >
-                      <span className="flex items-center gap-2.5">
-                        <Icon
-                          size={16}
-                          strokeWidth={1.8}
-                          className="shrink-0"
-                        />
+                      <span className="flex min-w-0 items-center gap-3">
+                        <span
+                          className={`${TILE} ${active ? TILE_TRAIL : TILE_IDLE}`}
+                        >
+                          <Icon size={15} strokeWidth={1.9} />
+                        </span>
                         <span className="truncate text-[12.5px] leading-5">
                           {item.label}
                         </span>
                       </span>
                       <ChevronDown
-                        size={13}
+                        size={14}
                         strokeWidth={2}
-                        className={`shrink-0 opacity-60 transition-transform duration-200 ${
+                        className={`mr-1 shrink-0 opacity-60 transition-transform duration-200 motion-reduce:transition-none ${
                           expanded ? "rotate-180" : ""
                         }`}
                       />
                     </button>
 
-                    {expanded && (
-                      <ul className="ml-[18px] mt-0.5 space-y-0.5 border-l border-[#E4E8E1] pl-2.5">
-                        {item.children.map((child) => {
-                          const childActive = matches(child.href, child.exact);
-                          return (
-                            <li key={child.href}>
-                              <Link
-                                href={child.href}
-                                aria-current={childActive ? "page" : undefined}
-                                className={`flex items-center rounded-md px-2.5 py-1 text-[12px] leading-5 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] ${
-                                  childActive
-                                    ? "bg-[var(--brand-color-soft)] text-[var(--brand-color)]"
-                                    : "text-[#6B746A] hover:bg-[#F1F3EE] hover:text-[#2B312A]"
-                                }`}
-                              >
-                                {child.label}
-                              </Link>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
+                    {/* Animated expand / collapse */}
+                    <div
+                      className={`grid transition-[grid-template-rows,visibility] duration-200 ease-out motion-reduce:transition-none ${
+                        expanded
+                          ? "visible grid-rows-[1fr]"
+                          : "invisible grid-rows-[0fr]"
+                      }`}
+                    >
+                      <div className="overflow-hidden">
+                        <ul className="relative ml-[22px] mt-1 space-y-0.5 border-l border-[#E4E8E1] pb-0.5 pl-3">
+                          {item.children.map((child) => {
+                            const childActive = matches(
+                              child.href,
+                              child.exact,
+                            );
+                            return (
+                              <li key={child.href} className="relative">
+                                {/* Dot on the guide line marks the current child */}
+                                {childActive && (
+                                  <span
+                                    aria-hidden
+                                    className="absolute -left-[16.5px] top-1/2 h-2 w-2 -translate-y-1/2 rounded-full ring-4 ring-[#FBFBF9]"
+                                    style={{
+                                      backgroundColor: "var(--brand-color)",
+                                    }}
+                                  />
+                                )}
+                                <Link
+                                  href={child.href}
+                                  aria-current={
+                                    childActive ? "page" : undefined
+                                  }
+                                  className={`flex items-center rounded-lg px-2.5 py-1.5 text-[12px] leading-5 font-medium transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] ${
+                                    childActive
+                                      ? "bg-[var(--brand-color-soft)] font-semibold text-[var(--brand-color)]"
+                                      : "text-[#6B746A] hover:bg-[#F0F2ED] hover:text-[#1F251E]"
+                                  }`}
+                                >
+                                  {child.label}
+                                </Link>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    </div>
                   </li>
                 );
               })}
@@ -286,7 +320,11 @@ export default function DashboardSidebar() {
           onClick={handleLogout}
           className={`${ROW} ${ROW_IDLE} hover:!bg-red-50 hover:!text-red-700`}
         >
-          <LogOut size={16} strokeWidth={1.8} className="shrink-0" />
+          <span
+            className={`${TILE} ${TILE_IDLE} group-hover:!bg-white group-hover:!text-red-600 group-hover:!ring-red-100`}
+          >
+            <LogOut size={15} strokeWidth={1.9} />
+          </span>
           Sign out
         </button>
       </div>
