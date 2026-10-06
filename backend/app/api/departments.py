@@ -12,7 +12,6 @@ from app.schemas.department import (
 )
 from app.services.department_service import (
     create_department,
-    delete_department,
     get_department,
     list_departments,
     update_department,
@@ -121,6 +120,7 @@ def create_new_department(
         return create_department(
             db=db,
             company_id=company_id,
+            user_id=current_user.id,
             name=payload.name.strip(),
             code=payload.code.strip() if payload.code else None,
             description=(payload.description.strip() if payload.description else None),
@@ -166,6 +166,7 @@ def update_existing_department(
         return update_department(
             db=db,
             department=department,
+            user_id=current_user.id,
             name=payload.name.strip(),
             code=payload.code.strip() if payload.code else None,
             description=(payload.description.strip() if payload.description else None),
@@ -176,37 +177,3 @@ def update_existing_department(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
         ) from exc
-
-
-@router.delete(
-    "/{department_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
-def delete_existing_department(
-    company_id: int,
-    department_id: int,
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-):
-    validate_company_membership(
-        db,
-        company_id,
-        current_user.id,
-    )
-
-    department = get_department(
-        db,
-        company_id,
-        department_id,
-    )
-
-    if department is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Department not found.",
-        )
-
-    delete_department(
-        db,
-        department,
-    )

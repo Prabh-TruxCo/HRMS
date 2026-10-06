@@ -54,6 +54,9 @@ const NAV: NavSection[] = [
           { label: "Overview", href: "/organization", exact: true },
           { label: "Branches", href: "/organization/branches" },
           { label: "Departments", href: "/organization/departments" },
+          { label: "Teams", href: "/organization/teams" },
+          { label: "Designations", href: "/organization/designations" },
+          { label: "Clients", href: "/organization/clients" },
         ],
       },
       {
@@ -112,7 +115,7 @@ export default function DashboardSidebar() {
   const { setCurrentUser } = useAuth();
   const { clearCompanyState, currentCompany } = useCompany();
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+  const API_URL = "http://localhost:8000";
 
   const logoUrl = currentCompany?.logo
     ? currentCompany.logo.startsWith("http")

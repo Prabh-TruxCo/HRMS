@@ -36,7 +36,7 @@ export type MemberRoleAssignmentRequest = {
 };
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
 
 async function parseResponse(response: Response) {
   const result = await response.json().catch(() => null);

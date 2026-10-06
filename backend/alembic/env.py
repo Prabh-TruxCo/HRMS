@@ -23,6 +23,9 @@ from app.models.workforce_configuration import WorkforceConfiguration
 from app.models.employment_type import EmploymentType
 from app.models.branch import Branch
 from app.models.department import Department
+from app.models.team import Team
+from app.models.designation import Designation
+from app.models.client import Client
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

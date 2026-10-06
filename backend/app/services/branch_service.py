@@ -2,6 +2,20 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.branch import Branch
+from app.models.company import Company
+from app.services.audit_log_service import AuditLogService
+
+
+def _get_account_id(
+    db: Session,
+    company_id: int,
+) -> int:
+    company = db.get(Company, company_id)
+
+    if company is None:
+        raise ValueError("Company not found.")
+
+    return company.account_id
 
 
 def list_branches(
@@ -37,6 +51,7 @@ def create_branch(
     db: Session,
     company_id: int,
     *,
+    user_id: int,
     name: str,
     code: str | None = None,
     description: str | None = None,
@@ -50,9 +65,7 @@ def create_branch(
         company_id=company_id,
         name=name.strip(),
         code=code.strip() if code else None,
-        description=description.strip()
-        if description
-        else None,
+        description=description.strip() if description else None,
         address=address.strip() if address else None,
         city=city.strip() if city else None,
         state=state.strip() if state else None,
@@ -63,13 +76,40 @@ def create_branch(
     db.add(branch)
 
     try:
+        db.flush()
+
+        account_id = _get_account_id(
+            db,
+            company_id,
+        )
+
+        AuditLogService(db).log(
+            user_id=user_id,
+            account_id=account_id,
+            company_id=company_id,
+            module="ORGANIZATION",
+            entity_type="BRANCH",
+            entity_id=branch.id,
+            action="CREATED",
+            description=f"Branch '{branch.name}' was created.",
+            new_values={
+                "name": branch.name,
+                "code": branch.code,
+                "description": branch.description,
+                "address": branch.address,
+                "city": branch.city,
+                "state": branch.state,
+                "country": branch.country,
+                "is_active": branch.is_active,
+            },
+        )
+
         db.commit()
         db.refresh(branch)
+
     except IntegrityError:
         db.rollback()
-        raise ValueError(
-            "A branch with this name already exists."
-        )
+        raise ValueError("A branch with this name already exists.")
 
     return branch
 
@@ -78,6 +118,7 @@ def update_branch(
     db: Session,
     branch: Branch,
     *,
+    user_id: int,
     name: str,
     code: str | None = None,
     description: str | None = None,
@@ -87,38 +128,76 @@ def update_branch(
     country: str = "India",
     is_active: bool,
 ) -> Branch:
+    old_values = {
+        "name": branch.name,
+        "code": branch.code,
+        "description": branch.description,
+        "address": branch.address,
+        "city": branch.city,
+        "state": branch.state,
+        "country": branch.country,
+        "is_active": branch.is_active,
+    }
+
+    old_is_active = branch.is_active
+
     branch.name = name.strip()
     branch.code = code.strip() if code else None
-    branch.description = (
-        description.strip()
-        if description
-        else None
-    )
-    branch.address = (
-        address.strip()
-        if address
-        else None
-    )
+    branch.description = description.strip() if description else None
+    branch.address = address.strip() if address else None
     branch.city = city.strip() if city else None
     branch.state = state.strip() if state else None
     branch.country = country.strip()
     branch.is_active = is_active
 
+    new_values = {
+        "name": branch.name,
+        "code": branch.code,
+        "description": branch.description,
+        "address": branch.address,
+        "city": branch.city,
+        "state": branch.state,
+        "country": branch.country,
+        "is_active": branch.is_active,
+    }
+
+    if old_is_active != is_active:
+        if is_active:
+            action = "ENABLED"
+            description = f"Branch '{branch.name}' was enabled."
+        else:
+            action = "DISABLED"
+            description = f"Branch '{branch.name}' was disabled."
+    else:
+        action = "UPDATED"
+        description = f"Branch '{branch.name}' was updated."
+
     try:
-        db.commit()
-        db.refresh(branch)
-    except IntegrityError:
-        db.rollback()
-        raise ValueError(
-            "A branch with this name already exists."
+        db.flush()
+
+        account_id = _get_account_id(
+            db,
+            branch.company_id,
         )
 
+        AuditLogService(db).log(
+            user_id=user_id,
+            account_id=account_id,
+            company_id=branch.company_id,
+            module="ORGANIZATION",
+            entity_type="BRANCH",
+            entity_id=branch.id,
+            action=action,
+            description=description,
+            old_values=old_values,
+            new_values=new_values,
+        )
+
+        db.commit()
+        db.refresh(branch)
+
+    except IntegrityError:
+        db.rollback()
+        raise ValueError("A branch with this name already exists.")
+
     return branch
-
-
-def delete_branch(
-    db: Session,
-    branch: Branch,
-) -> None:
-    db.delete(branch)
-    db.commit()

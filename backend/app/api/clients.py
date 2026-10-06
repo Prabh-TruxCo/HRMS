@@ -4,22 +4,23 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import get_current_user
 from app.db.session import get_db
 from app.models.company_membership import CompanyMembership
-from app.schemas.branch import (
-    BranchCreateRequest,
-    BranchListResponse,
-    BranchResponse,
-    BranchUpdateRequest,
+from app.schemas.client import (
+    ClientCreateRequest,
+    ClientListResponse,
+    ClientResponse,
+    ClientUpdateRequest,
 )
-from app.services.branch_service import (
-    create_branch,
-    get_branch,
-    list_branches,
-    update_branch,
+from app.services.client_service import (
+    create_client,
+    get_client,
+    list_clients,
+    update_client,
+    update_client_status,
 )
 
 router = APIRouter(
-    prefix="/companies/{company_id}/branches",
-    tags=["Branches"],
+    prefix="/companies/{company_id}/clients",
+    tags=["Clients"],
 )
 
 
@@ -47,9 +48,9 @@ def validate_company_membership(
 
 @router.get(
     "",
-    response_model=BranchListResponse,
+    response_model=ClientListResponse,
 )
-def get_branches(
+def get_clients(
     company_id: int,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
@@ -61,7 +62,7 @@ def get_branches(
     )
 
     return {
-        "branches": list_branches(
+        "clients": list_clients(
             db,
             company_id,
         )
@@ -69,12 +70,12 @@ def get_branches(
 
 
 @router.get(
-    "/{branch_id}",
-    response_model=BranchResponse,
+    "/{client_id}",
+    response_model=ClientResponse,
 )
-def get_branch_detail(
+def get_client_detail(
     company_id: int,
-    branch_id: int,
+    client_id: int,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -84,29 +85,29 @@ def get_branch_detail(
         current_user,
     )
 
-    branch = get_branch(
+    client = get_client(
         db,
         company_id,
-        branch_id,
+        client_id,
     )
 
-    if not branch:
+    if not client:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Branch not found.",
+            detail="Client not found.",
         )
 
-    return branch
+    return client
 
 
 @router.post(
     "",
-    response_model=BranchResponse,
+    response_model=ClientResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def create_branch_endpoint(
+def create_client_endpoint(
     company_id: int,
-    payload: BranchCreateRequest,
+    payload: ClientCreateRequest,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -117,17 +118,20 @@ def create_branch_endpoint(
     )
 
     try:
-        return create_branch(
+        return create_client(
             db,
             company_id,
             user_id=current_user.id,
             name=payload.name,
             code=payload.code,
-            description=payload.description,
+            contact_person=payload.contact_person,
+            phone=payload.phone,
+            email=payload.email,
             address=payload.address,
             city=payload.city,
             state=payload.state,
             country=payload.country,
+            description=payload.description,
             is_active=payload.is_active,
         )
     except ValueError as exc:
@@ -138,13 +142,13 @@ def create_branch_endpoint(
 
 
 @router.put(
-    "/{branch_id}",
-    response_model=BranchResponse,
+    "/{client_id}",
+    response_model=ClientResponse,
 )
-def update_branch_endpoint(
+def update_client_endpoint(
     company_id: int,
-    branch_id: int,
-    payload: BranchUpdateRequest,
+    client_id: int,
+    payload: ClientUpdateRequest,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -154,34 +158,79 @@ def update_branch_endpoint(
         current_user,
     )
 
-    branch = get_branch(
+    client = get_client(
         db,
         company_id,
-        branch_id,
+        client_id,
     )
 
-    if not branch:
+    if not client:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Branch not found.",
+            detail="Client not found.",
         )
 
     try:
-        return update_branch(
+        return update_client(
             db,
-            branch,
+            client,
             user_id=current_user.id,
             name=payload.name,
             code=payload.code,
-            description=payload.description,
+            contact_person=payload.contact_person,
+            phone=payload.phone,
+            email=payload.email,
             address=payload.address,
             city=payload.city,
             state=payload.state,
             country=payload.country,
-            is_active=payload.is_active,
+            description=payload.description,
         )
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+
+@router.patch(
+    "/{client_id}/status",
+    response_model=ClientResponse,
+)
+def update_client_status_endpoint(
+    company_id: int,
+    client_id: int,
+    is_active: bool,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    validate_company_membership(
+        db,
+        company_id,
+        current_user,
+    )
+
+    client = get_client(
+        db,
+        company_id,
+        client_id,
+    )
+
+    if not client:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Client not found.",
+        )
+
+    try:
+        return update_client_status(
+            db,
+            client,
+            user_id=current_user.id,
+            is_active=is_active,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc

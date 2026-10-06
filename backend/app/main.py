@@ -12,6 +12,9 @@ from app.api.permissions import router as permissions_router
 from app.api.branches import router as branches_router
 from app.api.departments import router as departments_router
 from app.api.audit_logs import router as audit_logs_router
+from app.api.teams import router as teams_router
+from app.api.designations import router as designations_router
+from app.api.clients import router as clients_router
 
 from pathlib import Path
 
@@ -37,17 +40,20 @@ app.mount(
     StaticFiles(directory=Path("uploads")),
     name="uploads",
 )
-app.include_router(auth_router)
-app.include_router(companies_router)
-app.include_router(membership_router)
-app.include_router(workforce_router)
-app.include_router(employment_router)
-app.include_router(roles_router)
-app.include_router(member_roles_router)
-app.include_router(permissions_router)
-app.include_router(branches_router)
-app.include_router(departments_router)
-app.include_router(audit_logs_router)
+app.include_router(auth_router, prefix="/api")
+app.include_router(companies_router, prefix="/api")
+app.include_router(membership_router, prefix="/api")
+app.include_router(workforce_router, prefix="/api")
+app.include_router(employment_router, prefix="/api")
+app.include_router(roles_router, prefix="/api")
+app.include_router(member_roles_router, prefix="/api")
+app.include_router(permissions_router, prefix="/api")
+app.include_router(branches_router, prefix="/api")
+app.include_router(departments_router, prefix="/api")
+app.include_router(audit_logs_router, prefix="/api")
+app.include_router(teams_router, prefix="/api")
+app.include_router(designations_router, prefix="/api")
+app.include_router(clients_router, prefix="/api")
 
 
 @app.get("/")

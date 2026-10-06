@@ -1,187 +1,183 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
 from app.db.session import get_db
 from app.models.company_membership import CompanyMembership
-from app.schemas.branch import (
-    BranchCreateRequest,
-    BranchListResponse,
-    BranchResponse,
-    BranchUpdateRequest,
+from app.schemas.team import (
+    TeamCreate,
+    TeamResponse,
+    TeamUpdate,
 )
-from app.services.branch_service import (
-    create_branch,
-    get_branch,
-    list_branches,
-    update_branch,
+from app.services.team_service import (
+    create_team,
+    get_team,
+    list_teams,
+    update_team,
 )
 
 router = APIRouter(
-    prefix="/companies/{company_id}/branches",
-    tags=["Branches"],
+    prefix="/companies/{company_id}/teams",
+    tags=["Teams"],
 )
 
 
 def validate_company_membership(
     db: Session,
+    user_id: int,
     company_id: int,
-    current_user,
 ) -> None:
     membership = (
         db.query(CompanyMembership)
         .filter(
+            CompanyMembership.user_id == user_id,
             CompanyMembership.company_id == company_id,
-            CompanyMembership.user_id == current_user.id,
             CompanyMembership.is_active.is_(True),
         )
         .first()
     )
 
-    if not membership:
+    if membership is None:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=403,
             detail="You do not have access to this company.",
         )
 
 
 @router.get(
     "",
-    response_model=BranchListResponse,
+    response_model=list[TeamResponse],
 )
-def get_branches(
+def get_teams(
     company_id: int,
+    department_id: int | None = Query(
+        default=None,
+    ),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
     validate_company_membership(
         db,
+        current_user.id,
         company_id,
-        current_user,
     )
 
-    return {
-        "branches": list_branches(
-            db,
-            company_id,
-        )
-    }
+    return list_teams(
+        db,
+        company_id,
+        department_id,
+    )
 
 
 @router.get(
-    "/{branch_id}",
-    response_model=BranchResponse,
+    "/{team_id}",
+    response_model=TeamResponse,
 )
-def get_branch_detail(
+def get_team_by_id(
     company_id: int,
-    branch_id: int,
+    team_id: int,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
     validate_company_membership(
         db,
+        current_user.id,
         company_id,
-        current_user,
     )
 
-    branch = get_branch(
+    team = get_team(
         db,
         company_id,
-        branch_id,
+        team_id,
     )
 
-    if not branch:
+    if team is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Branch not found.",
+            status_code=404,
+            detail="Team not found.",
         )
 
-    return branch
+    return team
 
 
 @router.post(
     "",
-    response_model=BranchResponse,
-    status_code=status.HTTP_201_CREATED,
+    response_model=TeamResponse,
+    status_code=201,
 )
-def create_branch_endpoint(
+def create_team_endpoint(
     company_id: int,
-    payload: BranchCreateRequest,
+    payload: TeamCreate,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
     validate_company_membership(
         db,
+        current_user.id,
         company_id,
-        current_user,
     )
 
     try:
-        return create_branch(
+        return create_team(
             db,
             company_id,
             user_id=current_user.id,
+            department_id=payload.department_id,
             name=payload.name,
             code=payload.code,
             description=payload.description,
-            address=payload.address,
-            city=payload.city,
-            state=payload.state,
-            country=payload.country,
             is_active=payload.is_active,
         )
     except ValueError as exc:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
+            status_code=400,
             detail=str(exc),
-        ) from exc
+        )
 
 
 @router.put(
-    "/{branch_id}",
-    response_model=BranchResponse,
+    "/{team_id}",
+    response_model=TeamResponse,
 )
-def update_branch_endpoint(
+def update_team_endpoint(
     company_id: int,
-    branch_id: int,
-    payload: BranchUpdateRequest,
+    team_id: int,
+    payload: TeamUpdate,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
     validate_company_membership(
         db,
+        current_user.id,
         company_id,
-        current_user,
     )
 
-    branch = get_branch(
+    team = get_team(
         db,
         company_id,
-        branch_id,
+        team_id,
     )
 
-    if not branch:
+    if team is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Branch not found.",
+            status_code=404,
+            detail="Team not found.",
         )
 
     try:
-        return update_branch(
+        return update_team(
             db,
-            branch,
+            team,
             user_id=current_user.id,
+            company_id=company_id,
+            department_id=payload.department_id,
             name=payload.name,
             code=payload.code,
             description=payload.description,
-            address=payload.address,
-            city=payload.city,
-            state=payload.state,
-            country=payload.country,
             is_active=payload.is_active,
         )
     except ValueError as exc:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
+            status_code=400,
             detail=str(exc),
-        ) from exc
+        )

@@ -1,6 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Activity, Pencil, Power } from "lucide-react";
+
+import AuditLogModal from "./AuditLogModal";
+import {
+  AuditLog,
+  getEntityAuditLogs,
+} from "@/features/company/services/auditLogService";
 
 import { useSnackbar } from "@/components/feedback/SnackbarProvider";
 import {
@@ -9,6 +16,7 @@ import {
   updateDepartment,
   type Department,
 } from "@/features/company/services/departmentService";
+import StatusConfirmModal from "@/components/feedback/StatusConfirmModal";
 
 type DepartmentManagementProps = {
   companyId: number | null;
@@ -44,7 +52,15 @@ export default function DepartmentManagement({
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(
     null,
   );
+  const [statusDepartment, setStatusDepartment] = useState<Department | null>(
+    null,
+  );
 
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
+  const [auditOpen, setAuditOpen] = useState(false);
+  const [auditEntityName, setAuditEntityName] = useState("");
   const [form, setForm] = useState<DepartmentForm>(EMPTY_FORM);
 
   useEffect(() => {
@@ -133,6 +149,92 @@ export default function DepartmentManagement({
     setEditingDepartment(null);
     setForm(EMPTY_FORM);
     setError(null);
+  }
+  function openStatusConfirmation(department: Department) {
+    setStatusDepartment(department);
+  }
+
+  function closeStatusConfirmation() {
+    if (saving) {
+      return;
+    }
+
+    setStatusDepartment(null);
+  }
+  async function handleConfirmDepartmentStatus() {
+    if (companyId === null || statusDepartment === null) {
+      return;
+    }
+
+    const department = statusDepartment;
+    const nextStatus = !department.is_active;
+
+    try {
+      setSaving(true);
+
+      await updateDepartment(companyId, department.id, {
+        name: department.name,
+        code: department.code ?? null,
+        description: department.description ?? null,
+        is_active: nextStatus,
+      });
+
+      const updatedDepartments = await getDepartments(companyId);
+
+      setDepartments(updatedDepartments);
+      setStatusDepartment(null);
+
+      showSuccess(
+        nextStatus
+          ? "Department enabled successfully."
+          : "Department disabled successfully.",
+      );
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Unable to update department status.";
+
+      showError(message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleViewActivity(department: Department) {
+    if (companyId === null) {
+      return;
+    }
+
+    try {
+      setAuditOpen(true);
+      setAuditEntityName(department.name);
+      setAuditLogs([]);
+      setAuditError(null);
+      setAuditLoading(true);
+
+      const logs = await getEntityAuditLogs(
+        companyId,
+        "DEPARTMENT",
+        department.id,
+      );
+
+      setAuditLogs(logs);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Unable to load activity.";
+
+      setAuditError(message);
+    } finally {
+      setAuditLoading(false);
+    }
+  }
+
+  function handleCloseActivity() {
+    setAuditOpen(false);
+    setAuditLogs([]);
+    setAuditError(null);
+    setAuditEntityName("");
   }
 
   async function handleSave(event: React.FormEvent<HTMLFormElement>) {
@@ -307,10 +409,20 @@ export default function DepartmentManagement({
                 {filteredDepartments.map((department) => (
                   <tr
                     key={department.id}
-                    className="transition-colors hover:bg-slate-50/60"
+                    className={`transition-colors ${
+                      department.is_active
+                        ? "hover:bg-slate-50/60"
+                        : "bg-slate-50/70 text-slate-500 hover:bg-slate-100/70"
+                    }`}
                   >
                     <td className="whitespace-nowrap px-4 py-3">
-                      <div className="text-sm font-medium text-slate-900">
+                      <div
+                        className={`text-sm font-medium ${
+                          department.is_active
+                            ? "text-slate-900"
+                            : "text-slate-500"
+                        }`}
+                      >
                         {department.name}
                       </div>
                     </td>
@@ -337,14 +449,47 @@ export default function DepartmentManagement({
                       </span>
                     </td>
 
-                    <td className="whitespace-nowrap px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => openEditModal(department)}
-                        className="rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-                      >
-                        Edit
-                      </button>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <div className="flex justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(department)}
+                          title="Edit department"
+                          aria-label={`Edit ${department.name}`}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-[var(--brand-color)]"
+                        >
+                          <Pencil size={15} />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => openStatusConfirmation(department)}
+                          disabled={saving}
+                          title={
+                            department.is_active
+                              ? "Disable department"
+                              : "Enable department"
+                          }
+                          aria-label={
+                            department.is_active
+                              ? `Disable ${department.name}`
+                              : `Enable ${department.name}`
+                          }
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-[var(--brand-color)] disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <Power size={15} />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => void handleViewActivity(department)}
+                          title="View activity"
+                          aria-label={`View activity for ${department.name}`}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-[var(--brand-color)]"
+                        >
+                          <Activity size={15} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -453,31 +598,6 @@ export default function DepartmentManagement({
                     className="w-full resize-none rounded-md border border-slate-200 px-3 py-2 text-xs text-slate-900 outline-none placeholder:text-slate-400 focus:border-[var(--brand-color)] focus:ring-2 focus:ring-[var(--brand-color-soft)]"
                   />
                 </div>
-
-                {/* Active */}
-                <label className="flex cursor-pointer items-start gap-2.5">
-                  <input
-                    type="checkbox"
-                    checked={form.is_active}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        is_active: event.target.checked,
-                      }))
-                    }
-                    className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 accent-[var(--brand-color)]"
-                  />
-
-                  <span>
-                    <span className="block text-xs font-medium text-slate-700">
-                      Active
-                    </span>
-
-                    <span className="mt-0.5 block text-[11px] text-slate-500">
-                      Allow this department to be used for employees.
-                    </span>
-                  </span>
-                </label>
               </div>
 
               {/* Footer */}
@@ -507,6 +627,24 @@ export default function DepartmentManagement({
           </div>
         </div>
       )}
+      <StatusConfirmModal
+        open={statusDepartment !== null}
+        entityName={statusDepartment?.name ?? ""}
+        entityType="Department"
+        isActive={statusDepartment?.is_active ?? false}
+        loading={saving}
+        onConfirm={() => void handleConfirmDepartmentStatus()}
+        onClose={closeStatusConfirmation}
+      />
+
+      <AuditLogModal
+        open={auditOpen}
+        entityName={auditEntityName}
+        logs={auditLogs}
+        loading={auditLoading}
+        error={auditError}
+        onClose={handleCloseActivity}
+      />
     </div>
   );
 }

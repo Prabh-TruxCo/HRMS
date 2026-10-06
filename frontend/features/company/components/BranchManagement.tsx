@@ -1,10 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
+import { Activity, Pencil, Power } from "lucide-react";
 import { useCompany } from "../context/CompanyContext";
 import { useSnackbar } from "@/components/feedback/SnackbarProvider";
-
+import AuditLogModal from "./AuditLogModal";
+import {
+  AuditLog,
+  getEntityAuditLogs,
+} from "@/features/company/services/auditLogService";
+import StatusConfirmModal from "@/components/feedback/StatusConfirmModal";
 import {
   createBranch,
   getBranches,
@@ -47,9 +52,15 @@ export default function BranchManagement() {
 
   const [showModal, setShowModal] = useState(false);
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
-
+  const [statusBranch, setStatusBranch] = useState<Branch | null>(null);
   const [form, setForm] = useState<BranchForm>(EMPTY_FORM);
   const { showSuccess, showError } = useSnackbar();
+
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
+  const [auditOpen, setAuditOpen] = useState(false);
+  const [auditEntityName, setAuditEntityName] = useState("");
   useEffect(() => {
     if (companyId === null) {
       return;
@@ -192,6 +203,96 @@ export default function BranchManagement() {
     }
   }
 
+  function openStatusConfirmation(branch: Branch) {
+    setStatusBranch(branch);
+  }
+
+  function closeStatusConfirmation() {
+    if (saving) {
+      return;
+    }
+
+    setStatusBranch(null);
+  }
+
+  async function handleConfirmBranchStatus() {
+    if (companyId === null || statusBranch === null) {
+      return;
+    }
+
+    const activeCompanyId = companyId;
+    const branch = statusBranch;
+    const nextStatus = !branch.is_active;
+
+    try {
+      setSaving(true);
+
+      const updated = await updateBranch(activeCompanyId, branch.id, {
+        name: branch.name,
+        code: branch.code ?? null,
+        description: branch.description ?? null,
+        address: branch.address ?? null,
+        city: branch.city ?? null,
+        state: branch.state ?? null,
+        country: branch.country,
+        is_active: nextStatus,
+      });
+
+      setBranches((current) =>
+        current
+          .map((item) => (item.id === updated.id ? updated : item))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      );
+
+      showSuccess(
+        nextStatus
+          ? "Branch enabled successfully."
+          : "Branch disabled successfully.",
+      );
+
+      setStatusBranch(null);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Unable to update branch status.";
+
+      showError(message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleViewActivity(branch: Branch) {
+    if (companyId === null) {
+      return;
+    }
+
+    try {
+      setAuditOpen(true);
+      setAuditEntityName(branch.name);
+      setAuditLogs([]);
+      setAuditError(null);
+      setAuditLoading(true);
+
+      const logs = await getEntityAuditLogs(companyId, "BRANCH", branch.id);
+
+      setAuditLogs(logs);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Unable to load activity.";
+
+      setAuditError(message);
+    } finally {
+      setAuditLoading(false);
+    }
+  }
+
+  function handleCloseActivity() {
+    setAuditOpen(false);
+    setAuditLogs([]);
+    setAuditError(null);
+    setAuditEntityName("");
+  }
+
   if (!currentCompany) {
     return (
       <div className="p-5 sm:p-6 lg:p-7">
@@ -298,10 +399,20 @@ export default function BranchManagement() {
                   {branches.map((branch) => (
                     <tr
                       key={branch.id}
-                      className="border-b border-[var(--border-muted)] last:border-b-0 hover:bg-[var(--surface-muted)]/40"
+                      className={`border-b border-[var(--border-muted)] last:border-b-0 transition-colors ${
+                        branch.is_active
+                          ? "hover:bg-[var(--surface-muted)]/40"
+                          : "bg-slate-50/70 text-slate-500 hover:bg-slate-100/70"
+                      }`}
                     >
                       <td className="px-4 py-3">
-                        <p className="text-sm font-medium text-[var(--text-primary)]">
+                        <p
+                          className={`text-sm font-medium ${
+                            branch.is_active
+                              ? "text-[var(--text-primary)]"
+                              : "text-[var(--text-secondary)]"
+                          }`}
+                        >
                           {branch.name}
                         </p>
 
@@ -339,9 +450,40 @@ export default function BranchManagement() {
                           <button
                             type="button"
                             onClick={() => openEditModal(branch)}
-                            className="rounded-md border border-[var(--border)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-primary)] transition hover:bg-[var(--surface-muted)]"
+                            title="Edit branch"
+                            aria-label={`Edit ${branch.name}`}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-[var(--brand-color)]"
                           >
-                            Edit
+                            <Pencil size={15} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => openStatusConfirmation(branch)}
+                            disabled={saving}
+                            title={
+                              branch.is_active
+                                ? "Disable branch"
+                                : "Enable branch"
+                            }
+                            aria-label={
+                              branch.is_active
+                                ? `Disable ${branch.name}`
+                                : `Enable ${branch.name}`
+                            }
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-[var(--brand-color)] disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <Power size={15} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => void handleViewActivity(branch)}
+                            title="View activity"
+                            aria-label={`View activity for ${branch.name}`}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-[var(--brand-color)]"
+                          >
+                            <Activity size={15} />
                           </button>
                         </div>
                       </td>
@@ -555,25 +697,6 @@ export default function BranchManagement() {
                     className="min-h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--brand-color)] focus:ring-2 focus:ring-[var(--brand-color-soft)]"
                   />
                 </div>
-
-                {/* Active */}
-                <label className="flex items-center gap-2.5 sm:mt-6">
-                  <input
-                    type="checkbox"
-                    checked={form.is_active}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        is_active: event.target.checked,
-                      }))
-                    }
-                    className="h-4 w-4 rounded border-[var(--border)] text-[var(--brand-color)] focus:ring-[var(--brand-color)]"
-                  />
-
-                  <span className="text-sm font-medium text-[var(--text-primary)]">
-                    Active branch
-                  </span>
-                </label>
               </div>
 
               {/* Modal footer */}
@@ -603,6 +726,23 @@ export default function BranchManagement() {
           </div>
         </div>
       )}
+      <StatusConfirmModal
+        open={statusBranch !== null}
+        entityName={statusBranch?.name ?? ""}
+        entityType="Branch"
+        isActive={statusBranch?.is_active ?? false}
+        loading={saving}
+        onConfirm={() => void handleConfirmBranchStatus()}
+        onClose={closeStatusConfirmation}
+      />
+      <AuditLogModal
+        open={auditOpen}
+        entityName={auditEntityName}
+        logs={auditLogs}
+        loading={auditLoading}
+        error={auditError}
+        onClose={handleCloseActivity}
+      />
     </>
   );
 }
