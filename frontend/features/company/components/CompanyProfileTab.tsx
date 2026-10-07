@@ -8,16 +8,19 @@ import {
   updateCompany,
   type CompanyDetail,
 } from "@/features/company/services/companyService";
+import { COMPANY_SIZES, COUNTRIES } from "@/features/onboarding/constants";
 import {
-  COMPANY_SIZES,
-  COUNTRIES,
-  INDUSTRIES,
-} from "@/features/onboarding/constants";
+  getIndustries,
+  type Industry,
+} from "@/features/company/services/industryService";
 
 export default function CompanyProfileTab() {
   const { currentCompany, isLoading: isCompanyLoading } = useCompany();
 
   const [company, setCompany] = useState<CompanyDetail | null>(null);
+  const [industries, setIndustries] = useState<Industry[]>([]);
+  const [industriesLoading, setIndustriesLoading] = useState(true);
+  const [industriesError, setIndustriesError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -64,6 +67,41 @@ export default function CompanyProfileTab() {
       isMounted = false;
     };
   }, [currentCompany]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadIndustries() {
+      try {
+        setIndustriesLoading(true);
+        setIndustriesError("");
+
+        const result = await getIndustries();
+
+        if (!cancelled) {
+          setIndustries(result);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setIndustriesError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load industries.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setIndustriesLoading(false);
+        }
+      }
+    }
+
+    void loadIndustries();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if (isCompanyLoading) {
     return (
@@ -118,6 +156,10 @@ export default function CompanyProfileTab() {
     }
 
     try {
+      if (company.industry_codes.length === 0) {
+        setError("Please select at least one industry.");
+        return;
+      }
       setIsSaving(true);
       setError("");
       setMessage("");
@@ -125,7 +167,7 @@ export default function CompanyProfileTab() {
       const updated = await updateCompany(company.id, {
         name: company.name.trim(),
         legal_name: company.legal_name?.trim() || null,
-        industry_type: company.industry_type,
+        industry_codes: company.industry_codes,
         employee_size: company.employee_size || null,
         country: company.country,
         timezone: company.timezone.trim(),
@@ -211,22 +253,62 @@ export default function CompanyProfileTab() {
             Industry
           </label>
 
-          <select
-            value={company.industry_type}
-            onChange={(event) =>
-              handleChange("industry_type", event.target.value)
-            }
-            required
-            className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-[var(--text-primary)] outline-none transition focus:border-[var(--brand-color)] focus:ring-2 focus:ring-[var(--brand-color-soft)]"
-          >
-            <option value="">Select industry</option>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Industries
+            </label>
 
-            {INDUSTRIES.map((industry) => (
-              <option key={industry} value={industry}>
-                {industry}
-              </option>
-            ))}
-          </select>
+            {industriesLoading ? (
+              <p className="text-sm text-gray-500">Loading industries...</p>
+            ) : industriesError ? (
+              <p className="text-sm text-red-600">{industriesError}</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {industries.map((industry) => {
+                  const selected = company.industry_codes.includes(
+                    industry.code,
+                  );
+
+                  return (
+                    <label
+                      key={industry.id}
+                      className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition ${
+                        selected
+                          ? "border-[#5F8F59] bg-[#5F8F59]/5"
+                          : "border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => {
+                          setCompany((previous) => {
+                            if (!previous) return previous;
+
+                            const industryCodes = selected
+                              ? previous.industry_codes.filter(
+                                  (code) => code !== industry.code,
+                                )
+                              : [...previous.industry_codes, industry.code];
+
+                            return {
+                              ...previous,
+                              industry_codes: industryCodes,
+                            };
+                          });
+                        }}
+                        className="h-4 w-4"
+                      />
+
+                      <span className="text-sm text-gray-700">
+                        {industry.name}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         <div>

@@ -39,7 +39,7 @@ def _create_recommended_employment_types(
 
 def get_workforce_recommendation(
     company_id: int,
-    industry_type: str | None,
+    industry_codes: list[str],
 ) -> WorkforceTemplate:
     """
     Return the recommended workforce template.
@@ -47,7 +47,7 @@ def get_workforce_recommendation(
     This function does NOT save anything to the database.
     """
 
-    return get_workforce_template(industry_type)
+    return get_workforce_template(industry_codes)
 
 
 def get_workforce_configuration(
@@ -72,7 +72,7 @@ def get_workforce_configuration(
 def update_workforce_configuration(
     db: Session,
     company_id: int,
-    industry_type: str | None,
+    industry_codes: list[str],
     setup_mode: str,
     attendance_enabled: bool,
     attendance_methods: list[str],
@@ -108,7 +108,7 @@ def update_workforce_configuration(
 
         db.add(configuration)
 
-        template = get_workforce_template(industry_type)
+        template = get_workforce_template(industry_codes)
 
         _create_recommended_employment_types(
             db=db,

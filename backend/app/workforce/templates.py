@@ -32,9 +32,23 @@ class WorkforceTemplate:
 
 INDUSTRY_TEMPLATES = {
     # ---------------------------------------------------------
-    # IT & SOFTWARE
+    # SECURITY
     # ---------------------------------------------------------
-    "it & software": WorkforceTemplate(
+    "SECURITY": WorkforceTemplate(
+        attendance_methods=("mobile", "face", "device"),
+        shifts_enabled=True,
+        overtime_enabled=True,
+        overtime_approval_required=True,
+        field_work_enabled=True,
+        gps_attendance_enabled=True,
+        geofencing_enabled=True,
+        auto_markout_enabled=True,
+        attendance_approval_required=True,
+    ),
+    # ---------------------------------------------------------
+    # IT / TECHNOLOGY
+    # ---------------------------------------------------------
+    "IT": WorkforceTemplate(
         attendance_methods=("web", "mobile", "face"),
         remote_work_enabled=True,
         employment_types=(
@@ -45,70 +59,41 @@ INDUSTRY_TEMPLATES = {
         ),
     ),
     # ---------------------------------------------------------
-    # CORPORATE
+    # BPO / BACK OFFICE
     # ---------------------------------------------------------
-    "corporate": WorkforceTemplate(
-        attendance_methods=("web", "mobile", "face"),
-        remote_work_enabled=True,
-        employment_types=(
-            "Full Time",
-            "Part Time",
-            "Contract",
-        ),
-    ),
-    # ---------------------------------------------------------
-    # LOGISTICS
-    # ---------------------------------------------------------
-    "logistics": WorkforceTemplate(
-        attendance_methods=("mobile", "face", "device"),
+    "BPO": WorkforceTemplate(
+        attendance_methods=("web", "mobile", "device"),
         shifts_enabled=True,
         overtime_enabled=True,
-        field_work_enabled=True,
-        gps_attendance_enabled=True,
-        geofencing_enabled=True,
         employment_types=(
             "Full Time",
             "Part Time",
             "Contract",
+            "Intern",
         ),
     ),
     # ---------------------------------------------------------
-    # HEALTHCARE
+    # HOSPITALITY
     # ---------------------------------------------------------
-    "healthcare": WorkforceTemplate(
+    "HOSPITALITY": WorkforceTemplate(
         attendance_methods=("device", "face", "mobile"),
         shifts_enabled=True,
         overtime_enabled=True,
         field_work_enabled=True,
-        employment_types=(
-            "Full Time",
-            "Part Time",
-            "Contract",
-        ),
     ),
     # ---------------------------------------------------------
-    # SECURITY & FACILITY
+    # RETAIL
     # ---------------------------------------------------------
-    "security & facility": WorkforceTemplate(
+    "RETAIL": WorkforceTemplate(
         attendance_methods=("mobile", "face", "device"),
         shifts_enabled=True,
         overtime_enabled=True,
-        overtime_approval_required=True,
         field_work_enabled=True,
-        gps_attendance_enabled=True,
-        geofencing_enabled=True,
-        auto_markout_enabled=True,
-        attendance_approval_required=True,
-        employment_types=(
-            "Full Time",
-            "Part Time",
-            "Contract",
-        ),
     ),
     # ---------------------------------------------------------
     # MANUFACTURING
     # ---------------------------------------------------------
-    "manufacturing": WorkforceTemplate(
+    "MANUFACTURING": WorkforceTemplate(
         attendance_methods=("device", "face"),
         shifts_enabled=True,
         overtime_enabled=True,
@@ -120,71 +105,59 @@ INDUSTRY_TEMPLATES = {
         ),
     ),
     # ---------------------------------------------------------
-    # RETAIL
+    # HEALTHCARE
     # ---------------------------------------------------------
-    "retail": WorkforceTemplate(
-        attendance_methods=("mobile", "face", "device"),
-        shifts_enabled=True,
-        overtime_enabled=True,
-        field_work_enabled=True,
-        employment_types=(
-            "Full Time",
-            "Part Time",
-            "Contract",
-        ),
-    ),
-    # ---------------------------------------------------------
-    # HOSPITALITY
-    # ---------------------------------------------------------
-    "hospitality": WorkforceTemplate(
+    "HEALTHCARE": WorkforceTemplate(
         attendance_methods=("device", "face", "mobile"),
         shifts_enabled=True,
         overtime_enabled=True,
         field_work_enabled=True,
-        employment_types=(
-            "Full Time",
-            "Part Time",
-            "Contract",
-        ),
     ),
     # ---------------------------------------------------------
     # EDUCATION
     # ---------------------------------------------------------
-    "education": WorkforceTemplate(
+    "EDUCATION": WorkforceTemplate(
         attendance_methods=("web", "face"),
-        employment_types=(
-            "Full Time",
-            "Part Time",
-            "Contract",
-        ),
     ),
     # ---------------------------------------------------------
-    # FIELD SERVICE
+    # LOGISTICS
     # ---------------------------------------------------------
-    "field service": WorkforceTemplate(
-        attendance_methods=("mobile", "face"),
+    "LOGISTICS": WorkforceTemplate(
+        attendance_methods=("mobile", "face", "device"),
+        shifts_enabled=True,
+        overtime_enabled=True,
+        field_work_enabled=True,
+        gps_attendance_enabled=True,
+        geofencing_enabled=True,
+    ),
+    # ---------------------------------------------------------
+    # FACILITY MANAGEMENT
+    # ---------------------------------------------------------
+    "FACILITY_MANAGEMENT": WorkforceTemplate(
+        attendance_methods=("mobile", "face", "device"),
         shifts_enabled=True,
         overtime_enabled=True,
         field_work_enabled=True,
         gps_attendance_enabled=True,
         geofencing_enabled=True,
         attendance_approval_required=True,
-        employment_types=(
-            "Full Time",
-            "Part Time",
-            "Contract",
-        ),
+    ),
+    # ---------------------------------------------------------
+    # STAFFING / MANPOWER
+    # ---------------------------------------------------------
+    "STAFFING": WorkforceTemplate(
+        attendance_methods=("mobile", "face", "device"),
+        shifts_enabled=True,
+        overtime_enabled=True,
+        field_work_enabled=True,
+        gps_attendance_enabled=True,
+        geofencing_enabled=True,
     ),
     # ---------------------------------------------------------
     # OTHER
     # ---------------------------------------------------------
-    "other": WorkforceTemplate(
+    "OTHER": WorkforceTemplate(
         attendance_methods=("web", "mobile"),
-        employment_types=(
-            "Full Time",
-            "Part Time",
-            "Contract",
-        ),
     ),
 }
 
@@ -193,14 +166,78 @@ DEFAULT_TEMPLATE = WorkforceTemplate()
 
 
 def get_workforce_template(
-    industry_type: str | None,
+    industry_codes: list[str],
 ) -> WorkforceTemplate:
-    if not industry_type:
+    """
+    Build a workforce recommendation from all selected industries.
+
+    Recommendations are merged across industries:
+    - Boolean capabilities use OR.
+    - Attendance methods are combined.
+    - Employment types are combined.
+    """
+
+    normalized_codes = {
+        code.strip().upper() for code in industry_codes if code and code.strip()
+    }
+
+    if not normalized_codes:
         return DEFAULT_TEMPLATE
 
-    normalized = industry_type.strip().lower()
+    templates = [
+        INDUSTRY_TEMPLATES[code]
+        for code in normalized_codes
+        if code in INDUSTRY_TEMPLATES
+    ]
 
-    return INDUSTRY_TEMPLATES.get(
-        normalized,
-        DEFAULT_TEMPLATE,
+    if not templates:
+        return DEFAULT_TEMPLATE
+
+    attendance_methods = tuple(
+        dict.fromkeys(
+            method for template in templates for method in template.attendance_methods
+        )
+    )
+
+    employment_types = tuple(
+        dict.fromkeys(
+            employment_type
+            for template in templates
+            for employment_type in template.employment_types
+        )
+    )
+
+    return WorkforceTemplate(
+        attendance_enabled=any(template.attendance_enabled for template in templates),
+        attendance_methods=attendance_methods or ("web",),
+        late_marking_enabled=any(
+            template.late_marking_enabled for template in templates
+        ),
+        grace_period_minutes=max(
+            template.grace_period_minutes for template in templates
+        ),
+        early_checkout_enabled=any(
+            template.early_checkout_enabled for template in templates
+        ),
+        auto_markout_enabled=any(
+            template.auto_markout_enabled for template in templates
+        ),
+        attendance_regularization_enabled=any(
+            template.attendance_regularization_enabled for template in templates
+        ),
+        attendance_approval_required=any(
+            template.attendance_approval_required for template in templates
+        ),
+        shifts_enabled=any(template.shifts_enabled for template in templates),
+        overtime_enabled=any(template.overtime_enabled for template in templates),
+        overtime_approval_required=any(
+            template.overtime_approval_required for template in templates
+        ),
+        remote_work_enabled=any(template.remote_work_enabled for template in templates),
+        field_work_enabled=any(template.field_work_enabled for template in templates),
+        gps_attendance_enabled=any(
+            template.gps_attendance_enabled for template in templates
+        ),
+        geofencing_enabled=any(template.geofencing_enabled for template in templates),
+        employment_types=employment_types or DEFAULT_TEMPLATE.employment_types,
     )

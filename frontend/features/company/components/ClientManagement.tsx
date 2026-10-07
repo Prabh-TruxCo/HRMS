@@ -23,6 +23,10 @@ import {
 import StatusConfirmModal from "@/components/feedback/StatusConfirmModal";
 import AuditLogModal from "@/features/company/components/AuditLogModal";
 import { useSnackbar } from "@/components/feedback/SnackbarProvider";
+import {
+  AuditLog,
+  getEntityAuditLogs,
+} from "@/features/company/services/auditLogService";
 
 type ClientManagementProps = {
   companyId: number | null;
@@ -42,9 +46,7 @@ const emptyForm: ClientPayload = {
   is_active: true,
 };
 
-export default function ClientManagement({
-  companyId,
-}: ClientManagementProps) {
+export default function ClientManagement({ companyId }: ClientManagementProps) {
   const { showSnackbar } = useSnackbar();
 
   const [clients, setClients] = useState<Client[]>([]);
@@ -54,22 +56,20 @@ export default function ClientManagement({
   const [search, setSearch] = useState("");
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingClient, setEditingClient] =
-    useState<Client | null>(null);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
 
-  const [form, setForm] =
-    useState<ClientPayload>(emptyForm);
+  const [form, setForm] = useState<ClientPayload>(emptyForm);
 
   const [saving, setSaving] = useState(false);
 
-  const [statusClient, setStatusClient] =
-    useState<Client | null>(null);
+  const [statusClient, setStatusClient] = useState<Client | null>(null);
 
-  const [statusLoading, setStatusLoading] =
-    useState(false);
+  const [statusLoading, setStatusLoading] = useState(false);
 
-  const [activityClient, setActivityClient] =
-    useState<Client | null>(null);
+  const [activityClient, setActivityClient] = useState<Client | null>(null);
+  const [activityLogs, setActivityLogs] = useState<AuditLog[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError] = useState<string | null>(null);
 
   useEffect(() => {
     if (companyId === null) {
@@ -97,9 +97,7 @@ export default function ClientManagement({
         }
 
         const message =
-          err instanceof Error
-            ? err.message
-            : "Unable to load clients.";
+          err instanceof Error ? err.message : "Unable to load clients.";
 
         setError(message);
       } finally {
@@ -134,9 +132,7 @@ export default function ClientManagement({
         client.state,
       ]
         .filter(Boolean)
-        .some((field) =>
-          String(field).toLowerCase().includes(value),
-        );
+        .some((field) => String(field).toLowerCase().includes(value));
     });
   }, [clients, search]);
 
@@ -178,19 +174,14 @@ export default function ClientManagement({
     setForm(emptyForm);
   }
 
-  function updateField(
-    field: keyof ClientPayload,
-    value: string | boolean,
-  ) {
+  function updateField(field: keyof ClientPayload, value: string | boolean) {
     setForm((current) => ({
       ...current,
       [field]: value,
     }));
   }
 
-  async function handleSubmit(
-    event: React.FormEvent<HTMLFormElement>,
-  ) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (companyId === null) {
@@ -198,10 +189,7 @@ export default function ClientManagement({
     }
 
     if (!form.name?.trim()) {
-      showSnackbar(
-        "Client name is required.",
-        "error",
-      );
+      showSnackbar("Client name is required.", "error");
       return;
     }
 
@@ -214,79 +202,51 @@ export default function ClientManagement({
         const payload: ClientPayload = {
           name: form.name.trim(),
           code: form.code?.trim() || null,
-          contact_person:
-            form.contact_person?.trim() || null,
+          contact_person: form.contact_person?.trim() || null,
           phone: form.phone?.trim() || null,
           email: form.email?.trim() || null,
           address: form.address?.trim() || null,
           city: form.city?.trim() || null,
           state: form.state?.trim() || null,
-          country:
-            form.country?.trim() || "India",
-          description:
-            form.description?.trim() || null,
+          country: form.country?.trim() || "India",
+          description: form.description?.trim() || null,
         };
 
-        result = await updateClient(
-          companyId,
-          editingClient.id,
-          payload,
-        );
+        result = await updateClient(companyId, editingClient.id, payload);
 
         setClients((current) =>
-          current.map((item) =>
-            item.id === result.id
-              ? result
-              : item,
-          ),
+          current.map((item) => (item.id === result.id ? result : item)),
         );
 
-        showSnackbar(
-          "Client updated successfully.",
-          "success",
-        );
+        showSnackbar("Client updated successfully.", "success");
       } else {
         const payload: ClientPayload = {
           name: form.name.trim(),
           code: form.code?.trim() || null,
-          contact_person:
-            form.contact_person?.trim() || null,
+          contact_person: form.contact_person?.trim() || null,
           phone: form.phone?.trim() || null,
           email: form.email?.trim() || null,
           address: form.address?.trim() || null,
           city: form.city?.trim() || null,
           state: form.state?.trim() || null,
-          country:
-            form.country?.trim() || "India",
-          description:
-            form.description?.trim() || null,
-          is_active:
-            form.is_active !== false,
+          country: form.country?.trim() || "India",
+          description: form.description?.trim() || null,
+          is_active: form.is_active !== false,
         };
 
-        result = await createClient(
-          companyId,
-          payload,
-        );
+        result = await createClient(companyId, payload);
 
         setClients((current) =>
-          [...current, result].sort((a, b) =>
-            a.name.localeCompare(b.name),
-          ),
+          [...current, result].sort((a, b) => a.name.localeCompare(b.name)),
         );
 
-        showSnackbar(
-          "Client created successfully.",
-          "success",
-        );
+        showSnackbar("Client created successfully.", "success");
       }
 
       closeModal();
     } catch (err) {
       const message =
-        err instanceof Error
-          ? err.message
-          : "Unable to save client.";
+        err instanceof Error ? err.message : "Unable to save client.";
 
       showSnackbar(message, "error");
     } finally {
@@ -295,10 +255,7 @@ export default function ClientManagement({
   }
 
   async function handleStatusConfirm() {
-    if (
-      companyId === null ||
-      statusClient === null
-    ) {
+    if (companyId === null || statusClient === null) {
       return;
     }
 
@@ -312,11 +269,7 @@ export default function ClientManagement({
       );
 
       setClients((current) =>
-        current.map((item) =>
-          item.id === result.id
-            ? result
-            : item,
-        ),
+        current.map((item) => (item.id === result.id ? result : item)),
       );
 
       showSnackbar(
@@ -329,9 +282,7 @@ export default function ClientManagement({
       setStatusClient(null);
     } catch (err) {
       const message =
-        err instanceof Error
-          ? err.message
-          : "Unable to update client status.";
+        err instanceof Error ? err.message : "Unable to update client status.";
 
       showSnackbar(message, "error");
     } finally {
@@ -339,21 +290,39 @@ export default function ClientManagement({
     }
   }
 
+  async function openActivity(client: Client) {
+    if (companyId === null) {
+      return;
+    }
+
+    setActivityClient(client);
+    setActivityLogs([]);
+    setActivityError(null);
+    setActivityLoading(true);
+
+    try {
+      const logs = await getEntityAuditLogs(companyId, "CLIENT", client.id);
+
+      setActivityLogs(logs);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Unable to load client activity.";
+
+      setActivityError(message);
+    } finally {
+      setActivityLoading(false);
+    }
+  }
   function formatLocation(client: Client) {
-    return [client.city, client.state]
-      .filter(Boolean)
-      .join(", ");
+    return [client.city, client.state].filter(Boolean).join(", ");
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 p-4 sm:p-6 lg:p-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <Users
-              size={20}
-              className="text-[var(--brand-color)]"
-            />
+            <Users size={20} className="text-[var(--brand-color)]" />
 
             <h1 className="text-xl font-semibold text-[var(--text-primary)]">
               Clients
@@ -385,9 +354,7 @@ export default function ClientManagement({
 
           <input
             value={search}
-            onChange={(event) =>
-              setSearch(event.target.value)
-            }
+            onChange={(event) => setSearch(event.target.value)}
             placeholder="Search clients..."
             className="h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] pl-9 pr-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--brand-color)]"
           />
@@ -405,15 +372,10 @@ export default function ClientManagement({
           </div>
         ) : filteredClients.length === 0 ? (
           <div className="px-5 py-12 text-center">
-            <Users
-              size={28}
-              className="mx-auto text-[var(--text-muted)]"
-            />
+            <Users size={28} className="mx-auto text-[var(--text-muted)]" />
 
             <p className="mt-3 text-sm font-medium text-[var(--text-primary)]">
-              {search
-                ? "No clients found"
-                : "No clients yet"}
+              {search ? "No clients found" : "No clients yet"}
             </p>
 
             <p className="mt-1 text-xs text-[var(--text-secondary)]">
@@ -458,9 +420,7 @@ export default function ClientManagement({
                   <tr
                     key={client.id}
                     className={`border-b border-[var(--border)] last:border-0 ${
-                      client.is_active
-                        ? ""
-                        : "opacity-60"
+                      client.is_active ? "" : "opacity-60"
                     }`}
                   >
                     <td className="px-5 py-4">
@@ -522,9 +482,7 @@ export default function ClientManagement({
                             : "bg-gray-100 text-gray-500"
                         }`}
                       >
-                        {client.is_active
-                          ? "Active"
-                          : "Inactive"}
+                        {client.is_active ? "Active" : "Inactive"}
                       </span>
                     </td>
 
@@ -533,9 +491,7 @@ export default function ClientManagement({
                         <button
                           type="button"
                           title="Edit"
-                          onClick={() =>
-                            openEditModal(client)
-                          }
+                          onClick={() => openEditModal(client)}
                           className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-secondary)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]"
                         >
                           <Pencil size={16} />
@@ -543,14 +499,8 @@ export default function ClientManagement({
 
                         <button
                           type="button"
-                          title={
-                            client.is_active
-                              ? "Disable"
-                              : "Enable"
-                          }
-                          onClick={() =>
-                            setStatusClient(client)
-                          }
+                          title={client.is_active ? "Disable" : "Enable"}
+                          onClick={() => setStatusClient(client)}
                           className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-secondary)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]"
                         >
                           <Power size={16} />
@@ -559,9 +509,7 @@ export default function ClientManagement({
                         <button
                           type="button"
                           title="Activity"
-                          onClick={() =>
-                            setActivityClient(client)
-                          }
+                          onClick={() => void openActivity(client)}
                           className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-secondary)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]"
                         >
                           <Activity size={16} />
@@ -582,9 +530,7 @@ export default function ClientManagement({
             <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-4">
               <div>
                 <h2 className="text-base font-semibold text-[var(--text-primary)]">
-                  {editingClient
-                    ? "Edit Client"
-                    : "Add Client"}
+                  {editingClient ? "Edit Client" : "Add Client"}
                 </h2>
 
                 <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
@@ -604,10 +550,7 @@ export default function ClientManagement({
               </button>
             </div>
 
-            <form
-              onSubmit={handleSubmit}
-              className="space-y-5 px-6 py-5"
-            >
+            <form onSubmit={handleSubmit} className="space-y-5 px-6 py-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                   <label className="mb-1.5 block text-sm font-medium text-[var(--text-primary)]">
@@ -617,10 +560,7 @@ export default function ClientManagement({
                   <input
                     value={form.name ?? ""}
                     onChange={(event) =>
-                      updateField(
-                        "name",
-                        event.target.value,
-                      )
+                      updateField("name", event.target.value)
                     }
                     required
                     className="h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--brand-color)]"
@@ -635,10 +575,7 @@ export default function ClientManagement({
                   <input
                     value={form.code ?? ""}
                     onChange={(event) =>
-                      updateField(
-                        "code",
-                        event.target.value,
-                      )
+                      updateField("code", event.target.value)
                     }
                     className="h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--brand-color)]"
                   />
@@ -652,10 +589,7 @@ export default function ClientManagement({
                   <input
                     value={form.contact_person ?? ""}
                     onChange={(event) =>
-                      updateField(
-                        "contact_person",
-                        event.target.value,
-                      )
+                      updateField("contact_person", event.target.value)
                     }
                     className="h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--brand-color)]"
                   />
@@ -669,10 +603,7 @@ export default function ClientManagement({
                   <input
                     value={form.phone ?? ""}
                     onChange={(event) =>
-                      updateField(
-                        "phone",
-                        event.target.value,
-                      )
+                      updateField("phone", event.target.value)
                     }
                     className="h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--brand-color)]"
                   />
@@ -687,10 +618,7 @@ export default function ClientManagement({
                     type="email"
                     value={form.email ?? ""}
                     onChange={(event) =>
-                      updateField(
-                        "email",
-                        event.target.value,
-                      )
+                      updateField("email", event.target.value)
                     }
                     className="h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--brand-color)]"
                   />
@@ -704,10 +632,7 @@ export default function ClientManagement({
                   <textarea
                     value={form.address ?? ""}
                     onChange={(event) =>
-                      updateField(
-                        "address",
-                        event.target.value,
-                      )
+                      updateField("address", event.target.value)
                     }
                     rows={2}
                     className="w-full resize-none rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus:border-[var(--brand-color)]"
@@ -722,10 +647,7 @@ export default function ClientManagement({
                   <input
                     value={form.city ?? ""}
                     onChange={(event) =>
-                      updateField(
-                        "city",
-                        event.target.value,
-                      )
+                      updateField("city", event.target.value)
                     }
                     className="h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--brand-color)]"
                   />
@@ -739,10 +661,7 @@ export default function ClientManagement({
                   <input
                     value={form.state ?? ""}
                     onChange={(event) =>
-                      updateField(
-                        "state",
-                        event.target.value,
-                      )
+                      updateField("state", event.target.value)
                     }
                     className="h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--brand-color)]"
                   />
@@ -756,10 +675,7 @@ export default function ClientManagement({
                   <input
                     value={form.country ?? "India"}
                     onChange={(event) =>
-                      updateField(
-                        "country",
-                        event.target.value,
-                      )
+                      updateField("country", event.target.value)
                     }
                     className="h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--brand-color)]"
                   />
@@ -773,10 +689,7 @@ export default function ClientManagement({
                   <textarea
                     value={form.description ?? ""}
                     onChange={(event) =>
-                      updateField(
-                        "description",
-                        event.target.value,
-                      )
+                      updateField("description", event.target.value)
                     }
                     rows={3}
                     className="w-full resize-none rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus:border-[var(--brand-color)]"
@@ -790,14 +703,10 @@ export default function ClientManagement({
                     type="checkbox"
                     checked={form.is_active !== false}
                     onChange={(event) =>
-                      updateField(
-                        "is_active",
-                        event.target.checked,
-                      )
+                      updateField("is_active", event.target.checked)
                     }
                     className="h-4 w-4 rounded border-[var(--border)]"
                   />
-
                   Active
                 </label>
               )}
@@ -836,23 +745,17 @@ export default function ClientManagement({
         isActive={statusClient?.is_active ?? false}
         loading={statusLoading}
         onConfirm={handleStatusConfirm}
-        onClose={() =>
-          statusLoading
-            ? undefined
-            : setStatusClient(null)
-        }
+        onClose={() => (statusLoading ? undefined : setStatusClient(null))}
       />
 
       {activityClient && companyId !== null && (
         <AuditLogModal
           open
-          companyId={companyId}
-          entityType="CLIENT"
-          entityId={activityClient.id}
           entityName={activityClient.name}
-          onClose={() =>
-            setActivityClient(null)
-          }
+          logs={activityLogs}
+          loading={activityLoading}
+          error={activityError}
+          onClose={() => setActivityClient(null)}
         />
       )}
     </div>

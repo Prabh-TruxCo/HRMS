@@ -44,7 +44,7 @@ export default function CompanySwitcher() {
           </p>
 
           <p className="truncate text-[10px] text-[var(--text-muted)]">
-            {currentCompany.industry_type}
+            {currentCompany.industry_codes.join(" · ")}
           </p>
         </div>
 
@@ -105,7 +105,7 @@ export default function CompanySwitcher() {
                       </p>
 
                       <p className="truncate text-[10px] text-[var(--text-muted)]">
-                        {company.industry_type}
+                        {company.industry_codes.join(" · ")}
                       </p>
                     </div>
 

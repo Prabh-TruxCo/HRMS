@@ -1,9 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Building2, ImagePlus, X } from "lucide-react";
 
-import { COMPANY_SIZES, COUNTRIES, INDUSTRIES } from "../constants";
+import {
+  getIndustries,
+  type Industry,
+} from "@/features/company/services/industryService";
+import { COMPANY_SIZES, COUNTRIES } from "../constants";
 
 import type { CompanySetup } from "../types";
 
@@ -17,7 +21,7 @@ const EMPTY_COMPANY: CompanySetup = {
   id: "",
   companyName: "",
   companyCode: "",
-  industry: "",
+  industryCodes: [],
   companySize: "",
   country: "India",
   logo: null,
@@ -31,10 +35,48 @@ export default function CompanySetupModal({
 }: CompanySetupModalProps) {
   const [form, setForm] = useState<CompanySetup>(company ?? EMPTY_COMPANY);
 
+  const [industries, setIndustries] = useState<Industry[]>([]);
+  const [industriesLoading, setIndustriesLoading] = useState(true);
+  const [industriesError, setIndustriesError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadIndustries() {
+      try {
+        setIndustriesLoading(true);
+        setIndustriesError("");
+
+        const result = await getIndustries();
+
+        if (!cancelled) {
+          setIndustries(result);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setIndustriesError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load industries.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setIndustriesLoading(false);
+        }
+      }
+    }
+
+    void loadIndustries();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const canSave =
     form.companyName.trim().length > 0 &&
     form.companyCode.trim().length > 0 &&
-    form.industry.length > 0 &&
+    form.industryCodes.length > 0 &&
     form.companySize.length > 0 &&
     form.country.length > 0;
 
@@ -159,34 +201,71 @@ export default function CompanySetupModal({
 
           {/* Industry */}
           <div className="mt-6">
-            <label className="mb-3 block text-[13px] font-medium text-[#414940]">
-              Industry
-            </label>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <label className="block text-[13px] font-medium text-[#414940]">
+                  Industry
+                </label>
 
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {INDUSTRIES.map((item) => {
-                const selected = form.industry === item;
+                <p className="mt-1 text-[11px] text-[#929A90]">
+                  Select all industries that apply to this company.
+                </p>
+              </div>
 
-                return (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => updateForm("industry", item)}
-                    className={`rounded-xl border px-3 py-2.5 text-left text-[12px] font-medium transition ${
-                      selected
-                        ? "border-[#7EA278] bg-[#EEF5EB] text-[#4E704A]"
-                        : "border-[#DDE2DA] bg-white text-[#687067] hover:border-[#B9C8B5] hover:bg-[#F8FAF7]"
-                    }`}
-                  >
-                    {item}
-                  </button>
-                );
-              })}
+              {form.industryCodes.length > 0 && (
+                <span className="shrink-0 rounded-full bg-[#EEF5EB] px-2.5 py-1 text-[10px] font-medium text-[#4E704A]">
+                  {form.industryCodes.length} selected
+                </span>
+              )}
             </div>
 
+            {industriesLoading ? (
+              <div className="rounded-xl border border-[#DDE2DA] bg-white px-4 py-4 text-[12px] text-[#929A90]">
+                Loading industries...
+              </div>
+            ) : industriesError ? (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[12px] text-red-700">
+                {industriesError}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {industries.map((industry) => {
+                  const selected = form.industryCodes.includes(industry.code);
+
+                  return (
+                    <button
+                      key={industry.code}
+                      type="button"
+                      onClick={() => {
+                        updateForm(
+                          "industryCodes",
+                          selected
+                            ? form.industryCodes.filter(
+                                (code) => code !== industry.code,
+                              )
+                            : [...form.industryCodes, industry.code],
+                        );
+                      }}
+                      className={`rounded-xl border px-3 py-2.5 text-left text-[12px] font-medium transition ${
+                        selected
+                          ? "border-[#7EA278] bg-[#EEF5EB] text-[#4E704A]"
+                          : "border-[#DDE2DA] bg-white text-[#687067] hover:border-[#B9C8B5] hover:bg-[#F8FAF7]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span>{industry.name}</span>
+
+                        {selected && <span className="text-[#5F8F59]">✓</span>}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             <p className="mt-2 text-[11px] text-[#929A90]">
-              Industry only provides sensible defaults. You can customize your
-              workspace later.
+              Your selections help us recommend sensible workforce settings. You
+              can customize everything later.
             </p>
           </div>
 

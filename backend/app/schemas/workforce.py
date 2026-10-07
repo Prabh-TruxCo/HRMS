@@ -65,7 +65,7 @@ class WorkforceConfigurationUpdateRequest(BaseModel):
 
 
 class WorkforceRecommendationResponse(BaseModel):
-    industry_type: str
+    industry_codes: list[str]
     setup_mode: str
 
     attendance_enabled: bool

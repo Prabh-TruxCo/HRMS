@@ -17,6 +17,7 @@ from app.services.company_service import (
     create_companies,
     get_user_companies,
     get_company_for_user,
+    get_company_detail,
     update_company,
     get_company_setup_status,
 )
@@ -162,7 +163,11 @@ def upload_company_logo(
         db.commit()
         db.refresh(company)
 
-        return company
+        return get_company_detail(
+            db=db,
+            user_id=current_user.id,
+            company_id=company_id,
+        )
 
     except Exception:
         db.rollback()
@@ -221,7 +226,7 @@ def get_company(
     db: Session = Depends(get_db),
 ):
     try:
-        return get_company_for_user(
+        return get_company_detail(
             db=db,
             user_id=current_user.id,
             company_id=company_id,
@@ -279,11 +284,17 @@ def update_company_endpoint(
     db: Session = Depends(get_db),
 ):
     try:
-        return update_company(
+        update_company(
             db=db,
             user_id=current_user.id,
             company_id=company_id,
             data=data,
+        )
+
+        return get_company_detail(
+            db=db,
+            user_id=current_user.id,
+            company_id=company_id,
         )
     except ValueError as exc:
         raise HTTPException(

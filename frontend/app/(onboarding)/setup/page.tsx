@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useRegistration } from "@/features/auth/context/RegistrationContext";
 import { registerAccount } from "@/features/auth/services/authService";
 import { createCompanies } from "@/features/onboarding/services/companyService";
 import { uploadCompanyLogo } from "@/features/company/services/companyLogoService";
+import {
+  getIndustries,
+  type Industry,
+} from "@/features/company/services/industryService";
 
 import SetupHeader from "@/features/onboarding/components/SetupHeader";
 import SetupProgress from "@/features/onboarding/components/SetupProgress";
@@ -22,6 +26,7 @@ export default function SetupPage() {
 
   const [workspaceName, setWorkspaceName] = useState("");
   const [companies, setCompanies] = useState<CompanySetup[]>([]);
+  const [industries, setIndustries] = useState<Industry[]>([]);
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<CompanySetup | null>(
     null,
@@ -34,6 +39,35 @@ export default function SetupPage() {
 
   const canContinue = workspaceName.trim().length > 0 && companies.length > 0;
 
+  useEffect(() => {
+  let cancelled = false;
+
+  async function loadIndustries() {
+    try {
+      const result = await getIndustries();
+
+      if (!cancelled) {
+        setIndustries(result);
+      }
+    } catch (error) {
+      console.error("Unable to load industries:", error);
+    }
+  }
+
+  void loadIndustries();
+
+  return () => {
+    cancelled = true;
+  };
+}, []);
+const getIndustryNames = (industryCodes: string[]) => {
+  return industryCodes
+    .map(
+      (code) =>
+        industries.find((industry) => industry.code === code)?.name ?? code,
+    )
+    .filter(Boolean);
+};
   const handleAddCompany = () => {
     setEditingCompany(null);
     setIsCompanyModalOpen(true);
@@ -85,7 +119,7 @@ export default function SetupPage() {
 
         company_name: firstCompany.companyName.trim(),
         company_code: firstCompany.companyCode.trim(),
-        industry_type: firstCompany.industry.trim(),
+        industry_codes: firstCompany.industryCodes,
         employee_size: firstCompany.companySize || null,
         country: firstCompany.country.trim(),
 
@@ -101,13 +135,13 @@ export default function SetupPage() {
       // ----------------------------------------
 
       const remainingCompanies = companies.slice(1).map((company) => ({
-        name: company.companyName.trim(),
-        industry_type: company.industry.trim(),
-        employee_size: company.companySize || null,
-        country: company.country.trim(),
-        code: company.companyCode.trim(),
-        color: company.brandColor || "#5F8F59",
-      }));
+  name: company.companyName.trim(),
+  industry_codes: company.industryCodes,
+  employee_size: company.companySize || null,
+  country: company.country.trim(),
+  code: company.companyCode.trim(),
+  color: company.brandColor || "#5F8F59",
+}));
 
       if (remainingCompanies.length > 0) {
         const createdCompanies = await createCompanies(remainingCompanies);
@@ -228,6 +262,7 @@ export default function SetupPage() {
                 companies={companies}
                 onAdd={handleAddCompany}
                 onEdit={handleEditCompany}
+                getIndustryNames={getIndustryNames}
               />
             )}
 

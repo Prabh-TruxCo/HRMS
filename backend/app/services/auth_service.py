@@ -1,11 +1,12 @@
-
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.account import Account
 from app.models.company import Company
+from app.models.company_industry import CompanyIndustry
 from app.models.company_membership import CompanyMembership
+from app.models.industry import Industry
 from app.models.membership_role import MembershipRole
 from app.models.permission import Permission
 from app.models.role import Role
@@ -47,12 +48,39 @@ def register_customer(
         db.add(account)
         db.flush()
 
+        industry_codes = list(
+            dict.fromkeys(
+                code.strip().upper() for code in data.industry_codes if code.strip()
+            )
+        )
+
+        if not industry_codes:
+            raise ValueError("At least one industry is required.")
+
+        industries = db.scalars(
+            select(Industry).where(
+                Industry.code.in_(industry_codes),
+                Industry.is_active.is_(True),
+            )
+        ).all()
+
+        industry_by_code = {industry.code: industry for industry in industries}
+
+        missing_codes = [
+            code for code in industry_codes if code not in industry_by_code
+        ]
+
+        if missing_codes:
+            raise ValueError(
+                f"Invalid or inactive industry code(s): {', '.join(missing_codes)}"
+            )
+
+        # 4. Create first company
         # 4. Create first company
         company = Company(
             account_id=account.id,
             name=data.company_name.strip(),
             code=data.company_code.strip().upper(),
-            industry_type=data.industry_type.strip(),
             employee_size=data.employee_size,
             country=data.country.strip(),
             color=data.color,
@@ -61,6 +89,15 @@ def register_customer(
 
         db.add(company)
         db.flush()
+
+        for index, code in enumerate(industry_codes):
+            db.add(
+                CompanyIndustry(
+                    company_id=company.id,
+                    industry_id=industry_by_code[code].id,
+                    is_primary=index == 0,
+                )
+            )
 
         # 5. Give the user access to the company
         membership = CompanyMembership(

@@ -1,17 +1,22 @@
 "use client";
 
 import { Building2, ImagePlus, Upload } from "lucide-react";
-import { INDUSTRIES, COMPANY_SIZES, COUNTRIES } from "../constants";
+import { COMPANY_SIZES, COUNTRIES } from "../constants";
+import {
+  getIndustries,
+  type Industry,
+} from "@/features/company/services/industryService";
+import { useEffect, useState } from "react";
 
 type CompanySetupCardProps = {
   companyName: string;
-  industry: string;
+  industryCodes: string[];
   companySize: string;
   country: string;
   logo: File | null;
   brandColor: string;
   onCompanyNameChange: (value: string) => void;
-  onIndustryChange: (value: string) => void;
+  onIndustryChange: (values: string[]) => void;
   onCompanySizeChange: (value: string) => void;
   onCountryChange: (value: string) => void;
   onLogoChange: (file: File | null) => void;
@@ -20,7 +25,7 @@ type CompanySetupCardProps = {
 
 export default function CompanySetupCard({
   companyName,
-  industry,
+  industryCodes,
   companySize,
   country,
   logo,
@@ -32,6 +37,44 @@ export default function CompanySetupCard({
   onLogoChange,
   onBrandColorChange,
 }: CompanySetupCardProps) {
+  const [industries, setIndustries] = useState<Industry[]>([]);
+  const [industriesLoading, setIndustriesLoading] = useState(true);
+  const [industriesError, setIndustriesError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadIndustries() {
+      try {
+        setIndustriesLoading(true);
+        setIndustriesError("");
+
+        const result = await getIndustries();
+
+        if (!cancelled) {
+          setIndustries(result);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setIndustriesError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load industries.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setIndustriesLoading(false);
+        }
+      }
+    }
+
+    void loadIndustries();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   return (
     <section className="rounded-2xl border border-[#E0E5DD] bg-[#FCFCFA] p-6 shadow-[0_8px_30px_rgba(41,43,39,0.04)] sm:p-7">
       {/* Header */}
@@ -90,25 +133,47 @@ export default function CompanySetupCard({
           </label>
 
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-            {INDUSTRIES.map((item) => {
-              const selected = industry === item;
+            {industries.map((item) => {
+              const selected = industryCodes.includes(item.code);
 
               return (
                 <button
-                  key={item}
+                  key={item.code}
                   type="button"
-                  onClick={() => onIndustryChange(item)}
+                  onClick={() => {
+                    const nextValues = selected
+                      ? industryCodes.filter((code) => code !== item.code)
+                      : [...industryCodes, item.code];
+
+                    onIndustryChange(nextValues);
+                  }}
                   className={`rounded-xl border px-3 py-2.5 text-left text-[12px] font-medium transition ${
                     selected
                       ? "border-[#7EA278] bg-[#EEF5EB] text-[#4E704A]"
                       : "border-[#DDE2DA] bg-white text-[#687067] hover:border-[#B9C8B5] hover:bg-[#F8FAF7]"
                   }`}
                 >
-                  {item}
+                  {item.name}
                 </button>
               );
             })}
           </div>
+          {industriesLoading && (
+            <p className="mt-3 text-[11px] text-[#8A9288]">
+              Loading industries...
+            </p>
+          )}
+
+          {industriesError && (
+            <p className="mt-3 text-[11px] text-red-600">{industriesError}</p>
+          )}
+
+          {industryCodes.length > 0 && !industriesLoading && (
+            <p className="mt-3 text-[11px] text-[#7B8379]">
+              {industryCodes.length}{" "}
+              {industryCodes.length === 1 ? "industry" : "industries"} selected
+            </p>
+          )}
         </div>
 
         {/* Size + Country */}
@@ -231,9 +296,7 @@ export default function CompanySetupCard({
                 <input
                   type="color"
                   value={brandColor}
-                  onChange={(event) =>
-                    onBrandColorChange(event.target.value)
-                  }
+                  onChange={(event) => onBrandColorChange(event.target.value)}
                   className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                 />
               </label>

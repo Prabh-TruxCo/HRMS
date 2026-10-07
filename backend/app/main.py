@@ -15,6 +15,7 @@ from app.api.audit_logs import router as audit_logs_router
 from app.api.teams import router as teams_router
 from app.api.designations import router as designations_router
 from app.api.clients import router as clients_router
+from app.api.industries import router as industries_router
 
 from pathlib import Path
 
@@ -54,6 +55,7 @@ app.include_router(audit_logs_router, prefix="/api")
 app.include_router(teams_router, prefix="/api")
 app.include_router(designations_router, prefix="/api")
 app.include_router(clients_router, prefix="/api")
+app.include_router(industries_router, prefix="/api")
 
 
 @app.get("/")

@@ -8,7 +8,7 @@ export type RegisterRequest = {
 
   company_name: string;
   company_code: string;
-  industry_type: string;
+  industry_codes: string[];
   employee_size: string | null;
   country: string;
 
@@ -55,7 +55,9 @@ export async function registerAccount(
 
   formData.append("company_name", data.company_name);
   formData.append("company_code", data.company_code);
-  formData.append("industry_type", data.industry_type);
+ data.industry_codes.forEach((code) => {
+  formData.append("industry_codes", code);
+});
   formData.append("employee_size", data.employee_size ?? "");
   formData.append("country", data.country);
 

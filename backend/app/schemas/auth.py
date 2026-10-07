@@ -28,10 +28,7 @@ class RegisterRequest(BaseModel):
         pattern=r"^[A-Za-z0-9]+$",
     )
 
-    industry_type: str = Field(
-        min_length=1,
-        max_length=100,
-    )
+    industry_codes: list[str] = Field(min_length=1)
 
     employee_size: str | None = Field(
         default=None,

@@ -1,8 +1,10 @@
 export type CreateCompanyRequest = {
   name: string;
-  industry_type: string;
+  industry_codes: string[];
   employee_size: string | null;
   country: string;
+  code: string;
+  color: string;
 };
 
 export type CompanyResponse = {
@@ -10,7 +12,7 @@ export type CompanyResponse = {
   account_id: number;
   name: string;
   code: string;
-  industry_type: string;
+  industry_codes: string[];
   employee_size: string | null;
   country: string;
   color: string | null;
@@ -18,7 +20,7 @@ export type CompanyResponse = {
   is_active: boolean;
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
 
 export async function createCompanies(
   companies: CreateCompanyRequest[],

@@ -6,7 +6,7 @@ export type CompanyDetail = {
   name: string;
   legal_name: string | null;
   code: string;
-  industry_type: string;
+  industry_codes: string[];
   employee_size: string | null;
   country: string;
   timezone: string;
@@ -18,7 +18,7 @@ export type CompanyDetail = {
 export type UpdateCompanyRequest = {
   name: string;
   legal_name: string | null;
-  industry_type: string;
+  industry_codes: string[];
   employee_size: string | null;
   country: string;
   timezone: string;
@@ -51,10 +51,10 @@ export async function updateCompany(
 ): Promise<CompanyDetail> {
   const response = await fetch(`${API_URL}/companies/${companyId}`, {
     method: "PUT",
-    credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
+    credentials: "include",
     body: JSON.stringify(data),
   });
 

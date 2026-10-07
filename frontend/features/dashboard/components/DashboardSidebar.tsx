@@ -24,6 +24,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { logoutAccount } from "@/features/auth/services/logoutService";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useCompany } from "@/features/company/context/CompanyContext";
+import { getOrganizationConfiguration } from "@/features/company/services/organizationService";
+import type { OrganizationConfiguration } from "@/features/company/services/organizationService";
 
 type NavChild = { label: string; href: string; exact?: boolean };
 type NavItem = {
@@ -57,6 +59,8 @@ const NAV: NavSection[] = [
           { label: "Teams", href: "/organization/teams" },
           { label: "Designations", href: "/organization/designations" },
           { label: "Clients", href: "/organization/clients" },
+          { label: "Sites", href: "/organization/sites" },
+          { label: "Posts", href: "/organization/posts" },
         ],
       },
       {
@@ -114,6 +118,8 @@ export default function DashboardSidebar() {
 
   const { setCurrentUser } = useAuth();
   const { clearCompanyState, currentCompany } = useCompany();
+  const [organizationConfiguration, setOrganizationConfiguration] =
+    useState<OrganizationConfiguration | null>(null);
 
   const API_URL = "http://localhost:8000";
 
@@ -128,6 +134,19 @@ export default function DashboardSidebar() {
       ? pathname === href
       : pathname === href || pathname.startsWith(`${href}/`);
 
+  const organizationVisibility: Record<string, boolean> = {
+    "/organization/branches":
+      organizationConfiguration?.branches_enabled ?? true,
+    "/organization/departments":
+      organizationConfiguration?.departments_enabled ?? true,
+    "/organization/teams": organizationConfiguration?.teams_enabled ?? true,
+    "/organization/designations":
+      organizationConfiguration?.designations_enabled ?? true,
+    "/organization/clients": organizationConfiguration?.clients_enabled ?? true,
+    "/organization/sites": organizationConfiguration?.sites_enabled ?? true,
+    "/organization/posts": organizationConfiguration?.posts_enabled ?? true,
+  };
+
   // Which groups are expanded (keyed by href). Auto-open the group for the current route.
   const [open, setOpen] = useState<Record<string, boolean>>({});
 
@@ -137,6 +156,36 @@ export default function DashboardSidebar() {
       .forEach((i) => setOpen((prev) => ({ ...prev, [i.href]: true })));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
+
+  useEffect(() => {
+    if (currentCompany?.id === undefined) {
+      return;
+    }
+
+    const companyId: number = currentCompany.id;
+
+    let cancelled = false;
+
+    async function loadOrganizationConfiguration(companyId: number) {
+      try {
+        const configuration = await getOrganizationConfiguration(companyId);
+
+        if (!cancelled) {
+          setOrganizationConfiguration(configuration);
+        }
+      } catch {
+        if (!cancelled) {
+          setOrganizationConfiguration(null);
+        }
+      }
+    }
+
+    void loadOrganizationConfiguration(companyId);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentCompany?.id]);
 
   const handleLogout = async () => {
     try {
@@ -272,39 +321,45 @@ export default function DashboardSidebar() {
                     >
                       <div className="overflow-hidden">
                         <ul className="relative ml-[22px] mt-1 space-y-0.5 border-l border-[#E4E8E1] pb-0.5 pl-3">
-                          {item.children.map((child) => {
-                            const childActive = matches(
-                              child.href,
-                              child.exact,
-                            );
-                            return (
-                              <li key={child.href} className="relative">
-                                {/* Dot on the guide line marks the current child */}
-                                {childActive && (
-                                  <span
-                                    aria-hidden
-                                    className="absolute -left-[16.5px] top-1/2 h-2 w-2 -translate-y-1/2 rounded-full ring-4 ring-[#FBFBF9]"
-                                    style={{
-                                      backgroundColor: "var(--brand-color)",
-                                    }}
-                                  />
-                                )}
-                                <Link
-                                  href={child.href}
-                                  aria-current={
-                                    childActive ? "page" : undefined
-                                  }
-                                  className={`flex items-center rounded-lg px-2.5 py-1.5 text-[12px] leading-5 font-medium transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] ${
-                                    childActive
-                                      ? "bg-[var(--brand-color-soft)] font-semibold text-[var(--brand-color)]"
-                                      : "text-[#6B746A] hover:bg-[#F0F2ED] hover:text-[#1F251E]"
-                                  }`}
-                                >
-                                  {child.label}
-                                </Link>
-                              </li>
-                            );
-                          })}
+                          {item.children
+                            .filter(
+                              (child) =>
+                                child.href === "/organization" ||
+                                organizationVisibility[child.href] !== false,
+                            )
+                            .map((child) => {
+                              const childActive = matches(
+                                child.href,
+                                child.exact,
+                              );
+                              return (
+                                <li key={child.href} className="relative">
+                                  {/* Dot on the guide line marks the current child */}
+                                  {childActive && (
+                                    <span
+                                      aria-hidden
+                                      className="absolute -left-[16.5px] top-1/2 h-2 w-2 -translate-y-1/2 rounded-full ring-4 ring-[#FBFBF9]"
+                                      style={{
+                                        backgroundColor: "var(--brand-color)",
+                                      }}
+                                    />
+                                  )}
+                                  <Link
+                                    href={child.href}
+                                    aria-current={
+                                      childActive ? "page" : undefined
+                                    }
+                                    className={`flex items-center rounded-lg px-2.5 py-1.5 text-[12px] leading-5 font-medium transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-color)] ${
+                                      childActive
+                                        ? "bg-[var(--brand-color-soft)] font-semibold text-[var(--brand-color)]"
+                                        : "text-[#6B746A] hover:bg-[#F0F2ED] hover:text-[#1F251E]"
+                                    }`}
+                                  >
+                                    {child.label}
+                                  </Link>
+                                </li>
+                              );
+                            })}
                         </ul>
                       </div>
                     </div>

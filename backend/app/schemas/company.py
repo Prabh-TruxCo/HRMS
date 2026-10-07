@@ -13,9 +13,8 @@ class CompanyCreateRequest(BaseModel):
         pattern=r"^[A-Za-z0-9]+$",
     )
 
-    industry_type: str = Field(
+    industry_codes: list[str] = Field(
         min_length=1,
-        max_length=100,
     )
 
     employee_size: str | None = Field(
@@ -27,7 +26,7 @@ class CompanyCreateRequest(BaseModel):
         default="India",
         max_length=100,
     )
-    
+
     color: str | None = Field(
         default=None,
         max_length=20,
@@ -46,7 +45,7 @@ class CompanyResponse(BaseModel):
     account_id: int
     name: str
     code: str
-    industry_type: str
+    industry_codes: list[str]
     employee_size: str | None
     country: str
     is_active: bool
@@ -64,7 +63,7 @@ class CompanyListItem(BaseModel):
     id: int
     name: str
     code: str
-    industry_type: str
+    industry_codes: list[str]
     employee_size: str | None
     country: str
     color: str | None
@@ -83,7 +82,9 @@ class MyCompaniesResponse(BaseModel):
 class CompanyUpdateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     legal_name: str | None = Field(default=None, max_length=200)
-    industry_type: str = Field(min_length=1, max_length=100)
+
+    industry_codes: list[str] = Field(min_length=1)
+
     employee_size: str | None = Field(default=None, max_length=50)
     country: str = Field(default="India", max_length=100)
     timezone: str = Field(default="Asia/Kolkata", max_length=100)
@@ -97,7 +98,9 @@ class CompanyDetailResponse(BaseModel):
     name: str
     legal_name: str | None
     code: str
-    industry_type: str
+
+    industry_codes: list[str]
+
     employee_size: str | None
     country: str
     timezone: str
@@ -116,4 +119,3 @@ class CompanySetupStatusResponse(BaseModel):
     completed_sections: int
     total_sections: int
     percentage: int
-

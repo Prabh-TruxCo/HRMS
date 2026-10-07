@@ -35,11 +35,6 @@ class Company(Base):
         nullable=False,
     )
 
-    industry_type: Mapped[str] = mapped_column(
-        String(100),
-        nullable=False,
-    )
-
     employee_size: Mapped[str | None] = mapped_column(
         String(50),
         nullable=True,
@@ -97,5 +92,11 @@ class Company(Base):
         "WorkforceConfiguration",
         back_populates="company",
         uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+    company_industries = relationship(
+        "CompanyIndustry",
+        back_populates="company",
         cascade="all, delete-orphan",
     )

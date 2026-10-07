@@ -1,7 +1,7 @@
 export type CompanySetup = {
   id: string;
   companyName: string;
-  industry: string;
+  industryCodes: string[];
   companySize: string;
   country: string;
   logo: File | null;

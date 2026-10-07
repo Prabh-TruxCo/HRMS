@@ -26,6 +26,8 @@ from app.models.department import Department
 from app.models.team import Team
 from app.models.designation import Designation
 from app.models.client import Client
+from app.models.industry import Industry
+from app.models.company_industry import CompanyIndustry
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

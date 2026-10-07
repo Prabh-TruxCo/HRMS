@@ -1,5 +1,3 @@
-import re
-
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -14,6 +12,8 @@ from app.models.user import User
 from app.schemas.company import CompanyCreateRequest, CompanyUpdateRequest
 from app.models.organization_configuration import OrganizationConfiguration
 from app.models.workforce_configuration import WorkforceConfiguration
+from app.models.company_industry import CompanyIndustry
+from app.models.industry import Industry
 
 
 def get_user_account(
@@ -71,11 +71,40 @@ def create_companies(
 
     try:
         for data in companies_data:
+            industry_codes = list(
+                dict.fromkeys(
+                    code.strip().upper() for code in data.industry_codes if code.strip()
+                )
+            )
+
+            if not industry_codes:
+                raise ValueError(
+                    f"At least one industry is required for company '{data.name}'."
+                )
+
+            industries = db.scalars(
+                select(Industry).where(
+                    Industry.code.in_(industry_codes),
+                    Industry.is_active.is_(True),
+                )
+            ).all()
+
+            industry_by_code = {industry.code: industry for industry in industries}
+
+            missing_codes = [
+                code for code in industry_codes if code not in industry_by_code
+            ]
+
+            if missing_codes:
+                raise ValueError(
+                    f"Invalid or inactive industry code(s) for "
+                    f"company '{data.name}': {', '.join(missing_codes)}"
+                )
+
             company = Company(
                 account_id=account.id,
                 name=data.name.strip(),
                 code=data.code.strip().upper(),
-                industry_type=data.industry_type.strip(),
                 employee_size=data.employee_size,
                 country=data.country.strip(),
                 color=data.color,
@@ -83,6 +112,15 @@ def create_companies(
 
             db.add(company)
             db.flush()
+
+            for index, code in enumerate(industry_codes):
+                db.add(
+                    CompanyIndustry(
+                        company_id=company.id,
+                        industry_id=industry_by_code[code].id,
+                        is_primary=index == 0,
+                    )
+                )
 
             membership = CompanyMembership(
                 user_id=current_user.id,
@@ -131,10 +169,32 @@ def create_companies(
         raise
 
 
+def _get_company_industry_codes(
+    db: Session,
+    company_id: int,
+) -> list[str]:
+    return list(
+        db.scalars(
+            select(Industry.code)
+            .join(
+                CompanyIndustry,
+                CompanyIndustry.industry_id == Industry.id,
+            )
+            .where(
+                CompanyIndustry.company_id == company_id,
+            )
+            .order_by(
+                CompanyIndustry.is_primary.desc(),
+                Industry.name,
+            )
+        ).all()
+    )
+
+
 def get_user_companies(
     db: Session,
     current_user: User,
-) -> list[Company]:
+) -> list[dict]:
     companies = db.scalars(
         select(Company)
         .join(
@@ -149,7 +209,24 @@ def get_user_companies(
         .order_by(Company.name)
     ).all()
 
-    return list(companies)
+    return [
+        {
+            "id": company.id,
+            "account_id": company.account_id,
+            "name": company.name,
+            "code": company.code,
+            "industry_codes": _get_company_industry_codes(
+                db,
+                company.id,
+            ),
+            "employee_size": company.employee_size,
+            "country": company.country,
+            "color": company.color,
+            "logo": company.logo,
+            "is_active": company.is_active,
+        }
+        for company in companies
+    ]
 
 
 def get_company_for_user(
@@ -176,6 +253,38 @@ def get_company_for_user(
     return company
 
 
+def get_company_detail(
+    db: Session,
+    user_id: int,
+    company_id: int,
+) -> dict:
+    company = get_company_for_user(
+        db=db,
+        user_id=user_id,
+        company_id=company_id,
+    )
+
+    industry_codes = _get_company_industry_codes(
+        db,
+        company.id,
+    )
+
+    return {
+        "id": company.id,
+        "account_id": company.account_id,
+        "name": company.name,
+        "legal_name": company.legal_name,
+        "code": company.code,
+        "industry_codes": list(industry_codes),
+        "employee_size": company.employee_size,
+        "country": company.country,
+        "timezone": company.timezone,
+        "color": company.color,
+        "logo": company.logo,
+        "is_active": company.is_active,
+    }
+
+
 def update_company(
     db: Session,
     user_id: int,
@@ -188,14 +297,58 @@ def update_company(
         company_id=company_id,
     )
 
+    industry_codes = list(
+        dict.fromkeys(
+            code.strip().upper() for code in data.industry_codes if code.strip()
+        )
+    )
+
+    if not industry_codes:
+        raise ValueError("At least one industry is required.")
+
+    industries = db.scalars(
+        select(Industry).where(
+            Industry.code.in_(industry_codes),
+            Industry.is_active.is_(True),
+        )
+    ).all()
+
+    industry_by_code = {industry.code: industry for industry in industries}
+
+    missing_codes = [code for code in industry_codes if code not in industry_by_code]
+
+    if missing_codes:
+        raise ValueError(
+            f"Invalid or inactive industry code(s): " f"{', '.join(missing_codes)}"
+        )
+
     company.name = data.name.strip()
     company.legal_name = data.legal_name.strip() if data.legal_name else None
-    company.industry_type = data.industry_type.strip()
+
     company.employee_size = data.employee_size
     company.country = data.country.strip()
     company.timezone = data.timezone.strip()
     company.color = data.color
     company.logo = data.logo
+
+    # Replace company-industry mappings.
+    existing_industries = db.scalars(
+        select(CompanyIndustry).where(CompanyIndustry.company_id == company.id)
+    ).all()
+
+    for company_industry in existing_industries:
+        db.delete(company_industry)
+
+    db.flush()
+
+    for index, code in enumerate(industry_codes):
+        db.add(
+            CompanyIndustry(
+                company_id=company.id,
+                industry_id=industry_by_code[code].id,
+                is_primary=index == 0,
+            )
+        )
 
     db.commit()
     db.refresh(company)
@@ -217,10 +370,19 @@ def get_company_setup_status(
     # ---------------------------------------------------------
     # 1. Company Profile
     # ---------------------------------------------------------
+    has_industry = (
+        db.scalar(
+            select(CompanyIndustry.id)
+            .where(CompanyIndustry.company_id == company.id)
+            .limit(1)
+        )
+        is not None
+    )
+
     profile = bool(
         company.name
         and company.code
-        and company.industry_type
+        and has_industry
         and company.employee_size
         and company.country
         and company.timezone

@@ -1,17 +1,3 @@
-export const INDUSTRIES = [
-  "IT & Software",
-  "Corporate",
-  "Logistics",
-  "Healthcare",
-  "Security & Facility",
-  "Manufacturing",
-  "Retail",
-  "Hospitality",
-  "Education",
-  "Field Service",
-  "Other",
-];
-
 export const COMPANY_SIZES = [
   "1–10",
   "11–50",

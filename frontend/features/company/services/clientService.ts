@@ -1,5 +1,4 @@
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
 
 export type Client = {
   id: number;
@@ -16,6 +15,10 @@ export type Client = {
   is_active: boolean;
 };
 
+export type ClientListResponse = {
+  clients: Client[];
+};
+
 export type ClientPayload = {
   name: string;
   code?: string | null;
@@ -30,9 +33,7 @@ export type ClientPayload = {
   is_active?: boolean;
 };
 
-async function handleResponse<T>(
-  response: Response,
-): Promise<T> {
+async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     let message = "Something went wrong.";
 
@@ -50,18 +51,15 @@ async function handleResponse<T>(
   return response.json() as Promise<T>;
 }
 
-export async function getClients(
-  companyId: number,
-): Promise<Client[]> {
-  const response = await fetch(
-    `${API_URL}/companies/${companyId}/clients`,
-    {
-      method: "GET",
-      credentials: "include",
-    },
-  );
+export async function getClients(companyId: number): Promise<Client[]> {
+  const response = await fetch(`${API_URL}/companies/${companyId}/clients`, {
+    method: "GET",
+    credentials: "include",
+  });
 
-  return handleResponse<Client[]>(response);
+  const data = await handleResponse<ClientListResponse>(response);
+
+  return data.clients;
 }
 
 export async function getClient(
@@ -83,17 +81,14 @@ export async function createClient(
   companyId: number,
   payload: ClientPayload,
 ): Promise<Client> {
-  const response = await fetch(
-    `${API_URL}/companies/${companyId}/clients`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-      body: JSON.stringify(payload),
+  const response = await fetch(`${API_URL}/companies/${companyId}/clients`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
     },
-  );
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
 
   return handleResponse<Client>(response);
 }

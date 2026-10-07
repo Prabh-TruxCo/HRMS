@@ -1,9 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
 from app.db.session import get_db
 from app.models.company import Company
+from app.models.company_industry import CompanyIndustry
+from app.models.industry import Industry
 from app.models.user import User
 from app.schemas.workforce import (
     WorkforceConfigurationResponse,
@@ -21,6 +24,28 @@ router = APIRouter(
     prefix="/companies",
     tags=["Workforce"],
 )
+
+
+def _get_company_industry_codes(
+    db: Session,
+    company_id: int,
+) -> list[str]:
+    return list(
+        db.scalars(
+            select(Industry.code)
+            .join(
+                CompanyIndustry,
+                CompanyIndustry.industry_id == Industry.id,
+            )
+            .where(
+                CompanyIndustry.company_id == company_id,
+            )
+            .order_by(
+                CompanyIndustry.is_primary.desc(),
+                Industry.name,
+            )
+        ).all()
+    )
 
 
 @router.get(
@@ -67,13 +92,18 @@ def get_workforce_recommendation_for_company(
         company_id=company_id,
     )
 
+    industry_codes = _get_company_industry_codes(
+        db=db,
+        company_id=company.id,
+    )
+
     template = get_workforce_recommendation(
         company_id=company.id,
-        industry_type=company.industry_type,
+        industry_codes=industry_codes,
     )
 
     return WorkforceRecommendationResponse(
-        industry_type=company.industry_type,
+        industry_codes=industry_codes,
         setup_mode="recommended",
         attendance_enabled=template.attendance_enabled,
         attendance_methods=list(template.attendance_methods),
@@ -110,10 +140,15 @@ def update_workforce(
         company_id=company_id,
     )
 
+    industry_codes = _get_company_industry_codes(
+        db=db,
+        company_id=company.id,
+    )
+
     return update_workforce_configuration(
         db=db,
         company_id=company.id,
-        industry_type=company.industry_type,
+        industry_codes=industry_codes,
         setup_mode=data.setup_mode,
         attendance_enabled=data.attendance_enabled,
         attendance_methods=data.attendance_methods,

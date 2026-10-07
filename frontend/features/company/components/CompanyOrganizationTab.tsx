@@ -45,7 +45,7 @@ const coreOrganizationOptions: OrganizationOption[] = [
     key: "designations_enabled",
     title: "Designations",
     description:
-      "Define job titles and positions such as Manager, Developer, or Supervisor.",
+      "Define employee job titles such as Manager, Developer, Supervisor, or Security Guard.",
     icon: Layers3,
   },
   {
@@ -60,8 +60,7 @@ const operationalOrganizationOptions: OrganizationOption[] = [
   {
     key: "clients_enabled",
     title: "Clients",
-    description:
-      "Manage customers or client organizations your company serves.",
+    description: "Manage customer or client organizations your company serves.",
     icon: BriefcaseBusiness,
   },
   {
@@ -73,9 +72,9 @@ const operationalOrganizationOptions: OrganizationOption[] = [
   },
   {
     key: "posts_enabled",
-    title: "Posts / Duties",
+    title: "Posts",
     description:
-      "Define specific positions or duty locations within operational sites.",
+      "Define operational posts or work positions within sites, such as Main Gate, Back Gate, Front Desk, Lift, Parking, or Control Room.",
     icon: LayoutGrid,
   },
 ];
@@ -137,12 +136,40 @@ export default function CompanyOrganizationTab() {
     setConfiguration((current) => {
       if (!current) return current;
 
-      return {
+      const nextValue = !current[key];
+
+      const updated = {
         ...current,
-        [key]: !current[key],
+        [key]: nextValue,
       };
+
+      /*
+       * Organization hierarchy:
+       *
+       * Client
+       *   ↓
+       * Site
+       *   ↓
+       * Post
+       *
+       * Therefore:
+       * - Sites cannot remain enabled when Clients are disabled.
+       * - Posts cannot remain enabled when Sites are disabled.
+       */
+
+      if (key === "clients_enabled" && !nextValue) {
+        updated.sites_enabled = false;
+        updated.posts_enabled = false;
+      }
+
+      if (key === "sites_enabled" && !nextValue) {
+        updated.posts_enabled = false;
+      }
+
+      return updated;
     });
 
+    setError("");
     setSuccess("");
   };
 
@@ -182,10 +209,9 @@ export default function CompanyOrganizationTab() {
   if (!currentCompany) {
     return (
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6">
-        {" "}
         <p className="text-sm text-[var(--text-secondary)]">
-          Please select a company to configure its organization.{" "}
-        </p>{" "}
+          Please select a company to configure its organization.
+        </p>
       </div>
     );
   }
@@ -193,10 +219,9 @@ export default function CompanyOrganizationTab() {
   if (isLoading) {
     return (
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6">
-        {" "}
         <p className="text-sm text-[var(--text-secondary)]">
-          Loading organization settings...{" "}
-        </p>{" "}
+          Loading organization settings...
+        </p>
       </div>
     );
   }
@@ -204,10 +229,9 @@ export default function CompanyOrganizationTab() {
   if (!configuration) {
     return (
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6">
-        {" "}
         <p className="text-sm text-red-600">
-          {error || "Organization configuration could not be loaded."}{" "}
-        </p>{" "}
+          {error || "Organization configuration could not be loaded."}
+        </p>
       </div>
     );
   }
@@ -216,10 +240,19 @@ export default function CompanyOrganizationTab() {
     const Icon = option.icon;
     const enabled = configuration[option.key];
 
+    const isSiteOption = option.key === "sites_enabled";
+    const isPostOption = option.key === "posts_enabled";
+
+    const disabled =
+      (isSiteOption && !configuration.clients_enabled) ||
+      (isPostOption && !configuration.sites_enabled);
+
     return (
       <div
         key={option.key}
-        className="flex items-center justify-between gap-5 p-5"
+        className={`flex items-center justify-between gap-5 p-5 ${
+          disabled ? "opacity-60" : ""
+        }`}
       >
         <div className="flex min-w-0 items-start gap-4">
           <div
@@ -240,6 +273,18 @@ export default function CompanyOrganizationTab() {
             <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">
               {option.description}
             </p>
+
+            {isSiteOption && !configuration.clients_enabled && (
+              <p className="mt-2 text-xs font-medium text-[var(--text-muted)]">
+                Enable Clients first to use Sites.
+              </p>
+            )}
+
+            {isPostOption && !configuration.sites_enabled && (
+              <p className="mt-2 text-xs font-medium text-[var(--text-muted)]">
+                Enable Sites first to use Posts.
+              </p>
+            )}
           </div>
         </div>
 
@@ -248,9 +293,14 @@ export default function CompanyOrganizationTab() {
           role="switch"
           aria-checked={enabled}
           aria-label={`Enable ${option.title}`}
+          disabled={disabled}
           onClick={() => handleToggle(option.key)}
           className={`relative flex h-7 w-12 shrink-0 items-center rounded-full transition ${
-            enabled ? "bg-[var(--brand-color)]" : "bg-[var(--border)]"
+            disabled
+              ? "cursor-not-allowed bg-[var(--border)]"
+              : enabled
+                ? "bg-[var(--brand-color)]"
+                : "bg-[var(--border)]"
           }`}
         >
           <span
@@ -269,17 +319,18 @@ export default function CompanyOrganizationTab() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}{" "}
+      {/* Header */}
       <div>
-        {" "}
         <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-          Organization Structure{" "}
+          Organization Structure
         </h2>
+
         <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--text-secondary)]">
           Choose the organizational structures your company uses. You can
           configure the actual records after enabling them.
         </p>
       </div>
+
       {/* Core Organization */}
       <div>
         <div className="mb-3">
@@ -298,6 +349,7 @@ export default function CompanyOrganizationTab() {
           </div>
         </div>
       </div>
+
       {/* Operational Organization */}
       <div>
         <div className="mb-3">
@@ -307,7 +359,7 @@ export default function CompanyOrganizationTab() {
 
           <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">
             Enable these when your company manages clients, operational sites,
-            or specific duty locations.
+            or specific posts within those sites.
           </p>
         </div>
 
@@ -317,17 +369,20 @@ export default function CompanyOrganizationTab() {
           </div>
         </div>
       </div>
+
       {/* Messages */}
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
       )}
+
       {success && (
         <div className="rounded-xl border border-[var(--brand-color-border)] bg-[var(--brand-color-soft)] px-4 py-3 text-sm text-[var(--brand-color)]">
           {success}
         </div>
       )}
+
       {/* Save */}
       <div className="flex justify-end">
         <button

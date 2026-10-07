@@ -13,6 +13,10 @@ import {
 } from "lucide-react";
 
 import { useCompany } from "@/features/company/context/CompanyContext";
+import {
+  getIndustries,
+  type Industry,
+} from "@/features/company/services/industryService";
 
 import {
   getWorkforceConfiguration,
@@ -82,7 +86,7 @@ export default function CompanyWorkforceTab() {
   const [employmentActive, setEmploymentActive] = useState(true);
   const [modalError, setModalError] = useState("");
   const [modalSaving, setModalSaving] = useState(false);
-
+  const [industries, setIndustries] = useState<Industry[]>([]);
   useEffect(() => {
     if (!currentCompany?.id) return;
 
@@ -93,10 +97,13 @@ export default function CompanyWorkforceTab() {
       setMessage("");
 
       try {
-        const [savedConfiguration, types] = await Promise.all([
+        const [savedConfiguration, types, industryList] = await Promise.all([
           getWorkforceConfiguration(currentCompany.id),
           getEmploymentTypes(currentCompany.id),
+          getIndustries(),
         ]);
+
+        setIndustries(industryList);
 
         if (savedConfiguration) {
           // Existing saved configuration.
@@ -389,8 +396,16 @@ export default function CompanyWorkforceTab() {
               Industry
             </p>
 
-            <p className="mt-1 text-base font-medium capitalize text-[var(--text-primary)]">
-              {currentCompany?.industry_type || "Not specified"}
+            <p className="mt-1 text-base font-medium text-[var(--text-primary)]">
+              {currentCompany?.industry_codes?.length
+                ? currentCompany.industry_codes
+                    .map(
+                      (code) =>
+                        industries.find((industry) => industry.code === code)
+                          ?.name ?? code,
+                    )
+                    .join(" · ")
+                : "Not specified"}
             </p>
           </div>
         </div>
@@ -463,6 +478,11 @@ export default function CompanyWorkforceTab() {
                       >
                         {type.is_active ? "Active" : "Inactive"}
                       </span>
+                      {type.id < 0 && (
+                        <span className="rounded-full bg-[var(--brand-color-soft)] px-2 py-0.5 text-[11px] text-[var(--brand-color)]">
+                          Recommended
+                        </span>
+                      )}
                     </div>
 
                     {type.description && (
@@ -472,25 +492,27 @@ export default function CompanyWorkforceTab() {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => openEditEmploymentModal(type)}
-                      className="rounded-lg p-2 text-[var(--text-secondary)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]"
-                      aria-label={`Edit ${type.name}`}
-                    >
-                      <Pencil size={16} />
-                    </button>
+                  {type.id > 0 && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => openEditEmploymentModal(type)}
+                        className="rounded-lg p-2 text-[var(--text-secondary)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]"
+                        aria-label={`Edit ${type.name}`}
+                      >
+                        <Pencil size={16} />
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteEmploymentType(type)}
-                      className="rounded-lg p-2 text-[var(--text-secondary)] transition hover:bg-red-50 hover:text-red-600"
-                      aria-label={`Delete ${type.name}`}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteEmploymentType(type)}
+                        className="rounded-lg p-2 text-[var(--text-secondary)] transition hover:bg-red-50 hover:text-red-600"
+                        aria-label={`Delete ${type.name}`}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

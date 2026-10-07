@@ -50,7 +50,7 @@ export type WorkforceConfigurationUpdate = {
 };
 
 export type WorkforceRecommendation = {
-  industry_type: string | null;
+  industry_codes: string[];
   setup_mode: "recommended" | "custom";
 
   attendance_enabled: boolean;

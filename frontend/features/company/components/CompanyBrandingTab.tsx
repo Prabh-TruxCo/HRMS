@@ -12,7 +12,7 @@ import {
 } from "@/features/company/services/companyService";
 import { uploadCompanyLogo } from "@/features/company/services/companyLogoService";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_URL = "http://localhost:8000";
 
 const DEFAULT_BRAND_COLOR = "#5F8F59";
 const MAX_LOGO_SIZE = 2 * 1024 * 1024;
@@ -170,7 +170,7 @@ export default function CompanyBrandingTab() {
       updatedCompany = await updateCompany(company.id, {
         name: updatedCompany.name,
         legal_name: updatedCompany.legal_name,
-        industry_type: updatedCompany.industry_type,
+        industry_codes: updatedCompany.industry_codes,
         employee_size: updatedCompany.employee_size,
         country: updatedCompany.country,
         timezone: updatedCompany.timezone,
