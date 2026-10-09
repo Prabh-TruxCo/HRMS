@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.models.branch import Branch
 from app.models.company import Company
 from app.services.audit_log_service import AuditLogService
+from sqlalchemy import func, or_
 
 
 def _get_account_id(
@@ -21,15 +22,50 @@ def _get_account_id(
 def list_branches(
     db: Session,
     company_id: int,
-) -> list[Branch]:
-    return (
-        db.query(Branch)
-        .filter(
-            Branch.company_id == company_id,
+    *,
+    page: int = 1,
+    page_size: int = 20,
+    search: str | None = None,
+) -> dict:
+    query = db.query(Branch).filter(
+        Branch.company_id == company_id,
+    )
+
+    search_term = search.strip() if search else ""
+
+    if search_term:
+        pattern = f"%{search_term}%"
+
+        query = query.filter(
+            or_(
+                Branch.name.ilike(pattern),
+                Branch.code.ilike(pattern),
+                Branch.description.ilike(pattern),
+                Branch.address.ilike(pattern),
+                Branch.city.ilike(pattern),
+                Branch.state.ilike(pattern),
+                Branch.country.ilike(pattern),
+            )
         )
-        .order_by(Branch.name.asc())
+
+    total = query.with_entities(func.count(Branch.id)).scalar() or 0
+
+    branches = (
+        query.order_by(Branch.name.asc(), Branch.id.asc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
         .all()
     )
+
+    total_pages = (total + page_size - 1) // page_size
+
+    return {
+        "branches": branches,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+    }
 
 
 def get_branch(

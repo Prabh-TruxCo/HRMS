@@ -39,9 +39,18 @@ export type UpdateBranchRequest = {
   is_active: boolean;
 };
 
-type BranchListResponse = {
-  branches: Branch[];
+export type BranchPagination = {
+total: number;
+page: number;
+page_size: number;
+total_pages: number;
 };
+
+export type PaginatedBranchesResponse =
+BranchPagination & {
+branches: Branch[];
+};
+
 
 async function parseResponse(
   response: Response,
@@ -58,23 +67,37 @@ async function parseResponse(
   return data;
 }
 
+
+export type BranchQueryParams = {
+  page?: number;
+  page_size?: number;
+  search?: string;
+};
+
 export async function getBranches(
   companyId: number,
-): Promise<Branch[]> {
+  params: BranchQueryParams = {},
+): Promise<PaginatedBranchesResponse> {
+  const query = new URLSearchParams({
+    page: String(params.page ?? 1),
+    page_size: String(params.page_size ?? 20),
+  });
+
+  if (params.search?.trim()) {
+    query.set("search", params.search.trim());
+  }
+
   const response = await fetch(
-    `${API_URL}/companies/${companyId}/branches`,
+    `${API_URL}/companies/${companyId}/branches?${query.toString()}`,
     {
       method: "GET",
       credentials: "include",
     },
   );
 
-  const result =
-    (await parseResponse(
-      response,
-    )) as BranchListResponse;
-
-  return result.branches;
+  return (await parseResponse(
+    response,
+  )) as PaginatedBranchesResponse;
 }
 
 export async function getBranch(

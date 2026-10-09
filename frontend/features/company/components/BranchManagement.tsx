@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, Pencil, Power } from "lucide-react";
+import { Activity, Pencil, Power, Search } from "lucide-react";
 import { useCompany } from "../context/CompanyContext";
 import { useSnackbar } from "@/components/feedback/SnackbarProvider";
 import AuditLogModal from "./AuditLogModal";
@@ -61,13 +61,35 @@ export default function BranchManagement() {
   const [auditError, setAuditError] = useState<string | null>(null);
   const [auditOpen, setAuditOpen] = useState(false);
   const [auditEntityName, setAuditEntityName] = useState("");
+
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Debounce search so the API isn't called on every keystroke.
   useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setPage(1);
+      setSearch(searchInput.trim());
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [searchInput]);
+
+  // Load the selected page from the backend.
+  useEffect(() => {
+    // The component already renders the company-selection state when no
+    // company is selected, so no state reset is needed here.
     if (companyId === null) {
       return;
     }
 
-    const activeCompanyId: number = companyId;
-
+    const activeCompanyId = companyId;
     let cancelled = false;
 
     async function loadBranches() {
@@ -75,10 +97,16 @@ export default function BranchManagement() {
         setLoading(true);
         setError(null);
 
-        const result = await getBranches(activeCompanyId);
+        const result = await getBranches(activeCompanyId, {
+          page,
+          page_size: pageSize,
+          search,
+        });
 
         if (!cancelled) {
-          setBranches(result);
+          setBranches(result.branches);
+          setTotal(result.total);
+          setTotalPages(result.total_pages);
         }
       } catch (err) {
         if (!cancelled) {
@@ -98,7 +126,7 @@ export default function BranchManagement() {
     return () => {
       cancelled = true;
     };
-  }, [companyId]);
+  }, [companyId, page, pageSize, search, refreshKey]);
 
   function openCreateModal() {
     setEditingBranch(null);
@@ -169,24 +197,13 @@ export default function BranchManagement() {
       };
 
       if (editingBranch) {
-        const updated = await updateBranch(
-          activeCompanyId,
-          editingBranch.id,
-          payload,
-        );
-
-        setBranches((current) =>
-          current
-            .map((branch) => (branch.id === updated.id ? updated : branch))
-            .sort((a, b) => a.name.localeCompare(b.name)),
-        );
+        await updateBranch(activeCompanyId, editingBranch.id, payload);
+        setRefreshKey((current) => current + 1);
         showSuccess("Branch updated successfully.");
       } else {
-        const created = await createBranch(activeCompanyId, payload);
-
-        setBranches((current) =>
-          [...current, created].sort((a, b) => a.name.localeCompare(b.name)),
-        );
+        await createBranch(activeCompanyId, payload);
+        setPage(1);
+        setRefreshKey((current) => current + 1);
         showSuccess("Branch created successfully.");
       }
       setShowModal(false);
@@ -227,7 +244,7 @@ export default function BranchManagement() {
     try {
       setSaving(true);
 
-      const updated = await updateBranch(activeCompanyId, branch.id, {
+      await updateBranch(activeCompanyId, branch.id, {
         name: branch.name,
         code: branch.code ?? null,
         description: branch.description ?? null,
@@ -238,11 +255,7 @@ export default function BranchManagement() {
         is_active: nextStatus,
       });
 
-      setBranches((current) =>
-        current
-          .map((item) => (item.id === updated.id ? updated : item))
-          .sort((a, b) => a.name.localeCompare(b.name)),
-      );
+      setRefreshKey((current) => current + 1);
 
       showSuccess(
         nextStatus
@@ -338,7 +351,27 @@ export default function BranchManagement() {
             {error}
           </div>
         )}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative w-full sm:max-w-sm">
+            <Search
+              size={17}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
+            />
 
+            <input
+              type="search"
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder="Search branches..."
+              aria-label="Search branches"
+              className="min-h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] pl-9 pr-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--brand-color)] focus:ring-2 focus:ring-[var(--brand-color-soft)]"
+            />
+          </div>
+
+          <p className="text-sm text-[var(--text-secondary)]">
+            {total} {total === 1 ? "branch" : "branches"} found
+          </p>
+        </div>
         {/* Loading */}
         {loading ? (
           <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 text-center">
@@ -350,28 +383,32 @@ export default function BranchManagement() {
           /* Empty state */
           <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)] px-6 py-8 text-center">
             <h3 className="text-sm font-semibold text-[var(--text-primary)]">
-              No branches yet
+              {search ? "No matching branches" : "No branches yet"}
             </h3>
 
             <p className="mx-auto mt-1 max-w-md text-sm text-[var(--text-secondary)]">
-              Create your first branch to start organizing employees by
-              location.
+              {search
+                ? "Try a different search term."
+                : "Create your first branch to start organizing employees by location."}
             </p>
 
-            <button
-              type="button"
-              onClick={openCreateModal}
-              className="mt-4 inline-flex min-h-10 items-center justify-center rounded-lg bg-[var(--brand-color)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[var(--brand-color-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-color)] focus:ring-offset-2"
-            >
-              Add Branch
-            </button>
+            {!search && (
+              <button
+                type="button"
+                onClick={openCreateModal}
+                className="mt-4 inline-flex min-h-10 items-center justify-center rounded-lg bg-[var(--brand-color)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[var(--brand-color-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-color)] focus:ring-offset-2"
+              >
+                Add Branch
+              </button>
+            )}
           </div>
         ) : (
           /* Branch table */
           <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-            <div className="overflow-x-auto">
+            {/* Only the table scrolls; the pagination footer stays outside this area. */}
+            <div className="h-[clamp(220px,calc(100dvh-360px),760px)] overflow-x-auto overflow-y-auto overscroll-contain">
               <table className="w-full min-w-[760px]">
-                <thead>
+                <thead className="sticky top-0 z-10">
                   <tr className="border-b border-[var(--border)] bg-[var(--surface-muted)] text-left">
                     <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
                       Branch
@@ -491,6 +528,58 @@ export default function BranchManagement() {
                   ))}
                 </tbody>
               </table>
+            </div>
+            <div className="relative z-10 flex min-w-0 shrink-0 flex-col gap-3 border-t border-[var(--border)] bg-[var(--surface)] px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 text-sm text-[var(--text-secondary)]">
+                <span>Rows per page</span>
+
+                <select
+                  value={pageSize}
+                  onChange={(event) => {
+                    setPageSize(Number(event.target.value));
+                    setPage(1);
+                  }}
+                  className="min-h-9 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 text-sm text-[var(--text-primary)]"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+
+                <span>
+                  {total === 0
+                    ? "0 results"
+                    : `${(page - 1) * pageSize + 1}–${Math.min(
+                        page * pageSize,
+                        total,
+                      )} of ${total}`}
+                </span>
+              </div>
+
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 sm:justify-end">
+                <button
+                  type="button"
+                  disabled={page <= 1 || loading}
+                  onClick={() => setPage((current) => current - 1)}
+                  className="min-h-9 shrink-0 rounded-lg border border-[var(--border)] px-3 text-sm text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Previous
+                </button>
+
+                <span className="whitespace-nowrap text-sm text-[var(--text-secondary)]">
+                  Page {totalPages === 0 ? 0 : page} of {totalPages}
+                </span>
+
+                <button
+                  type="button"
+                  disabled={page >= totalPages || loading}
+                  onClick={() => setPage((current) => current + 1)}
+                  className="min-h-9 shrink-0 rounded-lg border border-[var(--border)] px-3 text-sm text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           </div>
         )}
