@@ -21,3 +21,11 @@ class TeamResponse(TeamBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+
+
+class TeamListResponse(BaseModel):
+    teams: list[TeamResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int

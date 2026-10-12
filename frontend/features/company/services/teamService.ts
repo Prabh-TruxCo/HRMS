@@ -1,5 +1,4 @@
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
 
 export type Team = {
   id: number;
@@ -16,6 +15,21 @@ export type TeamPayload = {
   code?: string | null;
   description?: string | null;
   is_active: boolean;
+};
+
+export type TeamQueryParams = {
+  department_id?: number;
+  page?: number;
+  page_size?: number;
+  search?: string;
+};
+
+export type PaginatedTeamsResponse = {
+  teams: Team[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
 };
 
 async function handleResponse<T>(response: Response): Promise<T> {
@@ -40,25 +54,31 @@ async function handleResponse<T>(response: Response): Promise<T> {
 
 export async function getTeams(
   companyId: number,
-  departmentId?: number,
-): Promise<Team[]> {
-  const params = new URLSearchParams();
+  params: TeamQueryParams = {},
+): Promise<PaginatedTeamsResponse> {
+  const queryParams = new URLSearchParams();
 
-  if (departmentId !== undefined) {
-    params.set("department_id", String(departmentId));
+  queryParams.set("page", String(params.page ?? 1));
+  queryParams.set("page_size", String(params.page_size ?? 10));
+
+  if (params.department_id !== undefined) {
+    queryParams.set("department_id", String(params.department_id));
   }
 
-  const query = params.toString();
+  const search = params.search?.trim();
+  if (search) {
+    queryParams.set("search", search);
+  }
 
   const response = await fetch(
-    `${API_URL}/companies/${companyId}/teams${query ? `?${query}` : ""}`,
+    `${API_URL}/companies/${companyId}/teams?${queryParams.toString()}`,
     {
       method: "GET",
       credentials: "include",
     },
   );
 
-  return handleResponse<Team[]>(response);
+  return handleResponse<PaginatedTeamsResponse>(response);
 }
 
 export async function getTeam(
@@ -80,17 +100,14 @@ export async function createTeam(
   companyId: number,
   payload: TeamPayload,
 ): Promise<Team> {
-  const response = await fetch(
-    `${API_URL}/companies/${companyId}/teams`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-      body: JSON.stringify(payload),
+  const response = await fetch(`${API_URL}/companies/${companyId}/teams`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
     },
-  );
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
 
   return handleResponse<Team>(response);
 }

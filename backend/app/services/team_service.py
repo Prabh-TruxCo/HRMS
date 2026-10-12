@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -34,21 +34,46 @@ def list_teams(
     db: Session,
     company_id: int,
     department_id: int | None = None,
-) -> list[Team]:
+    *,
+    page: int = 1,
+    page_size: int = 10,
+    search: str | None = None,
+) -> tuple[list[Team], int]:
+    filters = [Department.company_id == company_id]
+
+    if department_id is not None:
+        filters.append(Team.department_id == department_id)
+
+    search_term = search.strip() if search else ""
+    if search_term:
+        pattern = f"%{search_term}%"
+        filters.append(
+            or_(
+                Team.name.ilike(pattern),
+                Team.code.ilike(pattern),
+                Team.description.ilike(pattern),
+            )
+        )
+
+    count_statement = (
+        select(func.count())
+        .select_from(Team)
+        .join(Department, Team.department_id == Department.id)
+        .where(*filters)
+    )
+    total = db.scalar(count_statement) or 0
+
     statement = (
         select(Team)
         .join(Department, Team.department_id == Department.id)
-        .where(Department.company_id == company_id)
+        .where(*filters)
+        .order_by(Team.name.asc(), Team.id.asc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
     )
 
-    if department_id is not None:
-        statement = statement.where(
-            Team.department_id == department_id
-        )
-
-    statement = statement.order_by(Team.name.asc())
-
-    return list(db.scalars(statement).all())
+    teams = list(db.scalars(statement).all())
+    return teams, total
 
 
 def get_team(
@@ -86,9 +111,7 @@ def create_team(
     )
 
     if department is None:
-        raise ValueError(
-            "Department not found for this company."
-        )
+        raise ValueError("Department not found for this company.")
 
     team = Team(
         department_id=department_id,
@@ -131,9 +154,7 @@ def create_team(
 
     except IntegrityError:
         db.rollback()
-        raise ValueError(
-            "A team with this name already exists in this department."
-        )
+        raise ValueError("A team with this name already exists in this department.")
 
     return team
 
@@ -157,9 +178,7 @@ def update_team(
     )
 
     if department is None:
-        raise ValueError(
-            "Department not found for this company."
-        )
+        raise ValueError("Department not found for this company.")
 
     old_values = {
         "department_id": team.department_id,
@@ -174,9 +193,7 @@ def update_team(
     team.department_id = department_id
     team.name = name.strip()
     team.code = code.strip() if code else None
-    team.description = (
-        description.strip() if description else None
-    )
+    team.description = description.strip() if description else None
     team.is_active = is_active
 
     new_values = {
@@ -190,19 +207,13 @@ def update_team(
     if old_is_active != is_active:
         if is_active:
             action = "ENABLED"
-            audit_description = (
-                f"Team '{team.name}' was enabled."
-            )
+            audit_description = f"Team '{team.name}' was enabled."
         else:
             action = "DISABLED"
-            audit_description = (
-                f"Team '{team.name}' was disabled."
-            )
+            audit_description = f"Team '{team.name}' was disabled."
     else:
         action = "UPDATED"
-        audit_description = (
-            f"Team '{team.name}' was updated."
-        )
+        audit_description = f"Team '{team.name}' was updated."
 
     try:
         db.flush()
@@ -230,8 +241,6 @@ def update_team(
 
     except IntegrityError:
         db.rollback()
-        raise ValueError(
-            "A team with this name already exists in this department."
-        )
+        raise ValueError("A team with this name already exists in this department.")
 
     return team

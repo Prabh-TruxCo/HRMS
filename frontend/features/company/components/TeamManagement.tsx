@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+
 import { Activity, Pencil, Power } from "lucide-react";
 
 import StatusConfirmModal from "@/components/feedback/StatusConfirmModal";
+
 import { useSnackbar } from "@/components/feedback/SnackbarProvider";
 
 import AuditLogModal from "./AuditLogModal";
+
 import { getEntityAuditLogs, type AuditLog } from "../services/auditLogService";
 
 import {
@@ -24,17 +27,25 @@ type TeamManagementProps = {
 
 type TeamForm = {
   department_id: string;
+
   name: string;
+
   code: string;
+
   description: string;
+
   is_active: boolean;
 };
 
 const EMPTY_FORM: TeamForm = {
   department_id: "",
+
   name: "",
+
   code: "",
+
   description: "",
+
   is_active: true,
 };
 
@@ -42,15 +53,26 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
   const { showSuccess, showError } = useSnackbar();
 
   const [teams, setTeams] = useState<Team[]>([]);
+
   const [departments, setDepartments] = useState<Department[]>([]);
 
   const [loading, setLoading] = useState(false);
+
   const [saving, setSaving] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
+
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const [showModal, setShowModal] = useState(false);
+
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
 
   const [statusTeam, setStatusTeam] = useState<Team | null>(null);
@@ -58,10 +80,23 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
   const [form, setForm] = useState<TeamForm>(EMPTY_FORM);
 
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+
   const [auditLoading, setAuditLoading] = useState(false);
+
   const [auditError, setAuditError] = useState<string | null>(null);
+
   const [auditOpen, setAuditOpen] = useState(false);
+
   const [auditEntityName, setAuditEntityName] = useState("");
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1);
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [searchInput]);
 
   useEffect(() => {
     if (companyId === null) {
@@ -77,29 +112,29 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
         setError(null);
 
         const [teamsData, departmentsData] = await Promise.all([
-          getTeams(activeCompanyId),
-          getDepartments(activeCompanyId),
+          getTeams(activeCompanyId, {
+            page,
+            page_size: pageSize,
+            search,
+            ...(selectedDepartmentId
+              ? { department_id: Number(selectedDepartmentId) }
+              : {}),
+          }),
+          getDepartments(activeCompanyId, { page: 1, page_size: 100 }),
         ]);
 
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
 
-        setTeams(teamsData);
+        setTeams(teamsData.teams);
+        setTotal(teamsData.total);
+        setTotalPages(teamsData.total_pages);
         setDepartments(departmentsData.departments);
       } catch (err) {
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
 
-        const message =
-          err instanceof Error ? err.message : "Unable to load teams.";
-
-        setError(message);
+        setError(err instanceof Error ? err.message : "Unable to load teams.");
       } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     }
 
@@ -108,7 +143,7 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
     return () => {
       cancelled = true;
     };
-  }, [companyId]);
+  }, [companyId, page, pageSize, search, selectedDepartmentId, refreshKey]);
 
   const departmentMap = useMemo(() => {
     return new Map(
@@ -116,29 +151,16 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
     );
   }, [departments]);
 
-  const filteredTeams = useMemo(() => {
-    const query = search.trim().toLowerCase();
-
-    if (!query) {
-      return teams;
-    }
-
-    return teams.filter((team) => {
-      const departmentName = departmentMap.get(team.department_id) ?? "";
-
-      return (
-        team.name.toLowerCase().includes(query) ||
-        team.code?.toLowerCase().includes(query) ||
-        team.description?.toLowerCase().includes(query) ||
-        departmentName.toLowerCase().includes(query)
-      );
-    });
-  }, [teams, search, departmentMap]);
-
   function openCreateModal() {
     setEditingTeam(null);
-    setForm(EMPTY_FORM);
+
+    setForm({
+      ...EMPTY_FORM,
+      department_id: selectedDepartmentId,
+    });
+
     setError(null);
+
     setShowModal(true);
   }
 
@@ -147,13 +169,18 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
 
     setForm({
       department_id: String(team.department_id),
+
       name: team.name,
+
       code: team.code ?? "",
+
       description: team.description ?? "",
+
       is_active: team.is_active,
     });
 
     setError(null);
+
     setShowModal(true);
   }
 
@@ -163,8 +190,11 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
     }
 
     setShowModal(false);
+
     setEditingTeam(null);
+
     setForm(EMPTY_FORM);
+
     setError(null);
   }
 
@@ -186,24 +216,25 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
     }
 
     const team = statusTeam;
+
     const nextStatus = !team.is_active;
 
     try {
       setSaving(true);
 
-      const updated = await updateTeam(companyId, team.id, {
+      await updateTeam(companyId, team.id, {
         department_id: team.department_id,
+
         name: team.name,
+
         code: team.code ?? null,
+
         description: team.description ?? null,
+
         is_active: nextStatus,
       });
 
-      setTeams((current) =>
-        current
-          .map((item) => (item.id === updated.id ? updated : item))
-          .sort((a, b) => a.name.localeCompare(b.name)),
-      );
+      setRefreshKey((current) => current + 1);
 
       setStatusTeam(null);
 
@@ -230,56 +261,63 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
     }
 
     const name = form.name.trim();
+
     const departmentId = Number(form.department_id);
 
     if (!departmentId || !Number.isInteger(departmentId)) {
       setError("Department is required.");
+
       return;
     }
 
     if (!name) {
       setError("Team name is required.");
+
       return;
     }
 
     try {
       setSaving(true);
+
       setError(null);
 
       const payload = {
         department_id: departmentId,
+
         name,
+
         code: form.code.trim() || null,
+
         description: form.description.trim() || null,
+
         is_active: form.is_active,
       };
 
       if (editingTeam) {
-        const updated = await updateTeam(companyId, editingTeam.id, payload);
-
-        setTeams((current) =>
-          current
-            .map((team) => (team.id === updated.id ? updated : team))
-            .sort((a, b) => a.name.localeCompare(b.name)),
-        );
+        await updateTeam(companyId, editingTeam.id, payload);
+        setRefreshKey((current) => current + 1);
 
         showSuccess("Team updated successfully.");
       } else {
-        const created = await createTeam(companyId, payload);
-
-        setTeams((current) =>
-          [...current, created].sort((a, b) => a.name.localeCompare(b.name)),
-        );
+        await createTeam(companyId, payload);
+        setSearchInput("");
+        setSearch("");
+        setPage(1);
+        setRefreshKey((current) => current + 1);
 
         showSuccess("Team created successfully.");
       }
 
-      closeModal();
+      setShowModal(false);
+      setEditingTeam(null);
+      setForm(EMPTY_FORM);
+      setError(null);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Unable to save team.";
 
       setError(message);
+
       showError(message);
     } finally {
       setSaving(false);
@@ -293,9 +331,13 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
 
     try {
       setAuditOpen(true);
+
       setAuditEntityName(team.name);
+
       setAuditLogs([]);
+
       setAuditError(null);
+
       setAuditLoading(true);
 
       const logs = await getEntityAuditLogs(companyId, "TEAM", team.id);
@@ -313,8 +355,11 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
 
   function handleCloseActivity() {
     setAuditOpen(false);
+
     setAuditLogs([]);
+
     setAuditError(null);
+
     setAuditEntityName("");
   }
 
@@ -330,6 +375,7 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
     <>
       <div className="space-y-4 p-4 sm:p-5">
         {/* Header */}
+
         <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <h2 className="text-base font-semibold text-slate-900">Teams</h2>
@@ -349,24 +395,57 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
         </div>
 
         {/* Search / Summary */}
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="w-full sm:max-w-xs">
-            <input
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search teams..."
-              className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[var(--brand-color)] focus:ring-2 focus:ring-[var(--brand-color-soft)]"
-            />
-          </div>
 
-          <p className="text-xs text-slate-500">
-            {filteredTeams.length}{" "}
-            {filteredTeams.length === 1 ? "team" : "teams"}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="grid w-full grid-cols-1 gap-3 sm:max-w-2xl sm:grid-cols-2">
+            <div>
+              <label
+                htmlFor="team-search"
+                className="mb-1.5 block text-xs font-medium text-slate-600"
+              >
+                Search teams
+              </label>
+              <input
+                id="team-search"
+                type="search"
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                placeholder="Team name, code, or description..."
+                className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[var(--brand-color)] focus:ring-2 focus:ring-[var(--brand-color-soft)]"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="team-department-filter"
+                className="mb-1.5 block text-xs font-medium text-slate-600"
+              >
+                Department
+              </label>
+              <select
+                id="team-department-filter"
+                value={selectedDepartmentId}
+                onChange={(event) => {
+                  setSelectedDepartmentId(event.target.value);
+                  setPage(1);
+                }}
+                className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 outline-none transition focus:border-[var(--brand-color)] focus:ring-2 focus:ring-[var(--brand-color-soft)]"
+              >
+                <option value="">All departments</option>
+                {departments.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <p className="shrink-0 text-xs text-slate-500">
+            {total} {total === 1 ? "team" : "teams"}
           </p>
         </div>
 
         {/* Error */}
+
         {error && !showModal && (
           <div
             role="alert"
@@ -377,28 +456,31 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
         )}
 
         {/* Table */}
+
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           {loading ? (
             <div className="px-4 py-10 text-center text-xs text-slate-500">
               Loading teams...
             </div>
-          ) : filteredTeams.length === 0 ? (
+          ) : teams.length === 0 ? (
             <div className="px-4 py-12 text-center">
               <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-slate-50 text-base text-slate-400">
                 ▦
               </div>
 
               <h3 className="mt-3 text-sm font-medium text-slate-900">
-                {search ? "No teams found" : "No teams yet"}
+                {searchInput.trim() || search || selectedDepartmentId
+                  ? "No teams found"
+                  : "No teams yet"}
               </h3>
 
               <p className="mt-1 text-xs text-slate-500">
-                {search
-                  ? "Try a different search term."
+                {search || selectedDepartmentId
+                  ? "Try changing the search term or department filter."
                   : "Create your first team to get started."}
               </p>
 
-              {!search && (
+              {!(searchInput.trim() || search || selectedDepartmentId) && (
                 <button
                   type="button"
                   onClick={openCreateModal}
@@ -409,9 +491,9 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
               )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="h-[clamp(220px,calc(100dvh-360px),760px)] overflow-x-auto overflow-y-auto overscroll-contain">
               <table className="min-w-full divide-y divide-slate-200">
-                <thead className="bg-slate-50/70">
+                <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
                   <tr>
                     <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                       Team
@@ -436,7 +518,7 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
                 </thead>
 
                 <tbody className="divide-y divide-slate-100">
-                  {filteredTeams.map((team) => (
+                  {teams.map((team) => (
                     <tr
                       key={team.id}
                       className={`transition-colors ${
@@ -527,9 +609,59 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
               </table>
             </div>
           )}
+          <div className="flex flex-col gap-3 border-t border-slate-200 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+              <label htmlFor="team-page-size">Rows per page</label>
+              <select
+                id="team-page-size"
+                value={pageSize}
+                onChange={(event) => {
+                  setPageSize(Number(event.target.value));
+                  setPage(1);
+                }}
+                className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-[var(--brand-color)]"
+              >
+                {[10, 20, 50, 100].map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+              <span>
+                {total === 0
+                  ? "0 results"
+                  : `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} of ${total}`}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={page <= 1 || loading}
+                className="h-8 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <span className="min-w-20 text-center text-xs text-slate-500">
+                Page {totalPages === 0 ? 0 : page} of {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setPage((current) => Math.min(totalPages, current + 1))
+                }
+                disabled={page >= totalPages || loading || totalPages === 0}
+                className="h-8 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Create / Edit Modal */}
+
         {showModal && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-5"
@@ -562,6 +694,7 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
                   )}
 
                   {/* Department */}
+
                   <div>
                     <label
                       htmlFor="team-department"
@@ -576,6 +709,7 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
                       onChange={(event) =>
                         setForm((current) => ({
                           ...current,
+
                           department_id: event.target.value,
                         }))
                       }
@@ -584,7 +718,9 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
                       <option value="">Select department</option>
 
                       {departments
+
                         .filter((department) => department.is_active)
+
                         .map((department) => (
                           <option key={department.id} value={department.id}>
                             {department.name}
@@ -594,6 +730,7 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
                   </div>
 
                   {/* Team Name */}
+
                   <div>
                     <label
                       htmlFor="team-name"
@@ -609,6 +746,7 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
                       onChange={(event) =>
                         setForm((current) => ({
                           ...current,
+
                           name: event.target.value,
                         }))
                       }
@@ -620,6 +758,7 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
                   </div>
 
                   {/* Code */}
+
                   <div>
                     <label
                       htmlFor="team-code"
@@ -635,6 +774,7 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
                       onChange={(event) =>
                         setForm((current) => ({
                           ...current,
+
                           code: event.target.value,
                         }))
                       }
@@ -645,6 +785,7 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
                   </div>
 
                   {/* Description */}
+
                   <div>
                     <label
                       htmlFor="team-description"
@@ -659,6 +800,7 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
                       onChange={(event) =>
                         setForm((current) => ({
                           ...current,
+
                           description: event.target.value,
                         }))
                       }

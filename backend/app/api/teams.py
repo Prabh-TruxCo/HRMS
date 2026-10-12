@@ -6,6 +6,7 @@ from app.db.session import get_db
 from app.models.company_membership import CompanyMembership
 from app.schemas.team import (
     TeamCreate,
+    TeamListResponse,
     TeamResponse,
     TeamUpdate,
 )
@@ -46,13 +47,17 @@ def validate_company_membership(
 
 @router.get(
     "",
-    response_model=list[TeamResponse],
+    response_model=TeamListResponse,
 )
 def get_teams(
     company_id: int,
     department_id: int | None = Query(
         default=None,
+        ge=1,
     ),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
+    search: str | None = Query(default=None, max_length=150),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -62,10 +67,21 @@ def get_teams(
         company_id,
     )
 
-    return list_teams(
+    teams, total = list_teams(
         db,
         company_id,
         department_id,
+        page=page,
+        page_size=page_size,
+        search=search,
+    )
+
+    return TeamListResponse(
+        teams=teams,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=(total + page_size - 1) // page_size,
     )
 
 
