@@ -1,21 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+
 import { Activity, Pencil, Power } from "lucide-react";
 
 import AuditLogModal from "./AuditLogModal";
+
 import {
   AuditLog,
   getEntityAuditLogs,
 } from "@/features/company/services/auditLogService";
 
 import { useSnackbar } from "@/components/feedback/SnackbarProvider";
+
 import {
   createDepartment,
   getDepartments,
   updateDepartment,
   type Department,
 } from "@/features/company/services/departmentService";
+
 import StatusConfirmModal from "@/components/feedback/StatusConfirmModal";
 
 type DepartmentManagementProps = {
@@ -24,15 +28,21 @@ type DepartmentManagementProps = {
 
 type DepartmentForm = {
   name: string;
+
   code: string;
+
   description: string;
+
   is_active: boolean;
 };
 
 const EMPTY_FORM: DepartmentForm = {
   name: "",
+
   code: "",
+
   description: "",
+
   is_active: true,
 };
 
@@ -42,33 +52,60 @@ export default function DepartmentManagement({
   const { showSuccess, showError } = useSnackbar();
 
   const [departments, setDepartments] = useState<Department[]>([]);
+
   const [loading, setLoading] = useState(false);
+
   const [saving, setSaving] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
 
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const [showModal, setShowModal] = useState(false);
+
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(
     null,
   );
+
   const [statusDepartment, setStatusDepartment] = useState<Department | null>(
     null,
   );
 
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+
   const [auditLoading, setAuditLoading] = useState(false);
+
   const [auditError, setAuditError] = useState<string | null>(null);
+
   const [auditOpen, setAuditOpen] = useState(false);
+
   const [auditEntityName, setAuditEntityName] = useState("");
+
   const [form, setForm] = useState<DepartmentForm>(EMPTY_FORM);
 
+  // Debounce search input to avoid an API request on every keystroke.
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setPage(1);
+      setSearch(searchInput.trim());
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [searchInput]);
+
+  // Load the current page from the backend.
   useEffect(() => {
     if (companyId === null) {
       return;
     }
 
-    const activeCompanyId: number = companyId;
+    const activeCompanyId = companyId;
     let cancelled = false;
 
     async function loadDepartments() {
@@ -76,10 +113,16 @@ export default function DepartmentManagement({
         setLoading(true);
         setError(null);
 
-        const result = await getDepartments(activeCompanyId);
+        const result = await getDepartments(activeCompanyId, {
+          page,
+          page_size: pageSize,
+          search,
+        });
 
         if (!cancelled) {
-          setDepartments(result);
+          setDepartments(result.departments);
+          setTotal(result.total);
+          setTotalPages(result.total_pages);
         }
       } catch (err) {
         if (!cancelled) {
@@ -101,28 +144,15 @@ export default function DepartmentManagement({
     return () => {
       cancelled = true;
     };
-  }, [companyId, showError]);
-
-  const filteredDepartments = useMemo(() => {
-    const query = search.trim().toLowerCase();
-
-    if (!query) {
-      return departments;
-    }
-
-    return departments.filter((department) => {
-      return (
-        department.name.toLowerCase().includes(query) ||
-        department.code?.toLowerCase().includes(query) ||
-        department.description?.toLowerCase().includes(query)
-      );
-    });
-  }, [departments, search]);
+  }, [companyId, page, pageSize, search, refreshKey, showError]);
 
   function openCreateModal() {
     setEditingDepartment(null);
+
     setForm(EMPTY_FORM);
+
     setError(null);
+
     setShowModal(true);
   }
 
@@ -131,12 +161,16 @@ export default function DepartmentManagement({
 
     setForm({
       name: department.name,
+
       code: department.code ?? "",
+
       description: department.description ?? "",
+
       is_active: department.is_active,
     });
 
     setError(null);
+
     setShowModal(true);
   }
 
@@ -146,10 +180,14 @@ export default function DepartmentManagement({
     }
 
     setShowModal(false);
+
     setEditingDepartment(null);
+
     setForm(EMPTY_FORM);
+
     setError(null);
   }
+
   function openStatusConfirmation(department: Department) {
     setStatusDepartment(department);
   }
@@ -161,12 +199,14 @@ export default function DepartmentManagement({
 
     setStatusDepartment(null);
   }
+
   async function handleConfirmDepartmentStatus() {
     if (companyId === null || statusDepartment === null) {
       return;
     }
 
     const department = statusDepartment;
+
     const nextStatus = !department.is_active;
 
     try {
@@ -174,14 +214,14 @@ export default function DepartmentManagement({
 
       await updateDepartment(companyId, department.id, {
         name: department.name,
+
         code: department.code ?? null,
+
         description: department.description ?? null,
+
         is_active: nextStatus,
       });
-
-      const updatedDepartments = await getDepartments(companyId);
-
-      setDepartments(updatedDepartments);
+      setRefreshKey((current) => current + 1);
       setStatusDepartment(null);
 
       showSuccess(
@@ -208,14 +248,20 @@ export default function DepartmentManagement({
 
     try {
       setAuditOpen(true);
+
       setAuditEntityName(department.name);
+
       setAuditLogs([]);
+
       setAuditError(null);
+
       setAuditLoading(true);
 
       const logs = await getEntityAuditLogs(
         companyId,
+
         "DEPARTMENT",
+
         department.id,
       );
 
@@ -232,8 +278,11 @@ export default function DepartmentManagement({
 
   function handleCloseActivity() {
     setAuditOpen(false);
+
     setAuditLogs([]);
+
     setAuditError(null);
+
     setAuditEntityName("");
   }
 
@@ -248,18 +297,23 @@ export default function DepartmentManagement({
 
     if (!name) {
       setError("Department name is required.");
+
       return;
     }
 
     try {
       setSaving(true);
+
       setError(null);
 
       if (editingDepartment) {
         await updateDepartment(companyId, editingDepartment.id, {
           name,
+
           code: form.code.trim() || null,
+
           description: form.description.trim() || null,
+
           is_active: form.is_active,
         });
 
@@ -267,23 +321,25 @@ export default function DepartmentManagement({
       } else {
         await createDepartment(companyId, {
           name,
+
           code: form.code.trim() || null,
+
           description: form.description.trim() || null,
+
           is_active: form.is_active,
         });
 
+        setPage(1);
         showSuccess("Department created successfully.");
       }
-
-      const updatedDepartments = await getDepartments(companyId);
-
-      setDepartments(updatedDepartments);
+      setRefreshKey((current) => current + 1);
       closeModal();
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Unable to save department.";
 
       setError(message);
+
       showError(message);
     } finally {
       setSaving(false);
@@ -301,6 +357,7 @@ export default function DepartmentManagement({
   return (
     <div className="space-y-4 p-4 sm:p-5">
       {/* Header */}
+
       <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h2 className="text-base font-semibold text-slate-900">
@@ -322,24 +379,25 @@ export default function DepartmentManagement({
       </div>
 
       {/* Search / Summary */}
+
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="w-full sm:max-w-xs">
           <input
             type="search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
             placeholder="Search departments..."
             className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[var(--brand-color)] focus:ring-2 focus:ring-[var(--brand-color-soft)]"
           />
         </div>
 
         <p className="text-xs text-slate-500">
-          {filteredDepartments.length}{" "}
-          {filteredDepartments.length === 1 ? "department" : "departments"}
+          {total} {total === 1 ? "department" : "departments"} found
         </p>
       </div>
 
       {/* Error */}
+
       {error && !showModal && (
         <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
           {error}
@@ -347,19 +405,20 @@ export default function DepartmentManagement({
       )}
 
       {/* Table */}
+
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
         {loading ? (
           <div className="px-4 py-10 text-center text-xs text-slate-500">
             Loading departments...
           </div>
-        ) : filteredDepartments.length === 0 ? (
+        ) : departments.length === 0 ? (
           <div className="px-4 py-12 text-center">
             <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-slate-50 text-base text-slate-400">
               ▦
             </div>
 
             <h3 className="mt-3 text-sm font-medium text-slate-900">
-              {search ? "No departments found" : "No departments yet"}
+              {search ? "No matching departments" : "No departments yet"}
             </h3>
 
             <p className="mt-1 text-xs text-slate-500">
@@ -379,9 +438,9 @@ export default function DepartmentManagement({
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="h-[clamp(220px,calc(100dvh-360px),760px)] overflow-x-auto overflow-y-auto overscroll-contain">
             <table className="min-w-full divide-y divide-slate-200">
-              <thead className="bg-slate-50/70">
+              <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
                 <tr>
                   <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     Department
@@ -406,7 +465,7 @@ export default function DepartmentManagement({
               </thead>
 
               <tbody className="divide-y divide-slate-100">
-                {filteredDepartments.map((department) => (
+                {departments.map((department) => (
                   <tr
                     key={department.id}
                     className={`transition-colors ${
@@ -497,13 +556,63 @@ export default function DepartmentManagement({
             </table>
           </div>
         )}
+
+        <div className="flex flex-col gap-3 border-t border-slate-200 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            <label htmlFor="department-page-size">Rows per page</label>
+            <select
+              id="department-page-size"
+              value={pageSize}
+              onChange={(event) => {
+                setPageSize(Number(event.target.value));
+                setPage(1);
+              }}
+              className="h-9 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900"
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span>
+              {total === 0
+                ? "0 results"
+                : `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} of ${total}`}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+            <button
+              type="button"
+              disabled={page <= 1 || loading}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              className="min-h-9 rounded-md border border-slate-200 px-3 text-xs text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <span className="px-1 text-xs text-slate-500">
+              Page {totalPages === 0 ? 0 : page} of {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={page >= totalPages || loading}
+              onClick={() =>
+                setPage((current) => Math.min(totalPages, current + 1))
+              }
+              className="min-h-9 rounded-md border border-slate-200 px-3 text-xs text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Create / Edit Modal */}
+
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-5">
           <div className="w-full max-w-md overflow-hidden rounded-xl bg-white shadow-xl">
             {/* Modal Header */}
+
             <div className="border-b border-slate-200 px-5 py-4">
               <h3 className="text-base font-semibold text-slate-900">
                 {editingDepartment ? "Edit Department" : "Add Department"}
@@ -525,6 +634,7 @@ export default function DepartmentManagement({
                 )}
 
                 {/* Department Name */}
+
                 <div>
                   <label
                     htmlFor="department-name"
@@ -540,6 +650,7 @@ export default function DepartmentManagement({
                     onChange={(event) =>
                       setForm((current) => ({
                         ...current,
+
                         name: event.target.value,
                       }))
                     }
@@ -551,6 +662,7 @@ export default function DepartmentManagement({
                 </div>
 
                 {/* Code */}
+
                 <div>
                   <label
                     htmlFor="department-code"
@@ -566,6 +678,7 @@ export default function DepartmentManagement({
                     onChange={(event) =>
                       setForm((current) => ({
                         ...current,
+
                         code: event.target.value,
                       }))
                     }
@@ -576,6 +689,7 @@ export default function DepartmentManagement({
                 </div>
 
                 {/* Description */}
+
                 <div>
                   <label
                     htmlFor="department-description"
@@ -590,6 +704,7 @@ export default function DepartmentManagement({
                     onChange={(event) =>
                       setForm((current) => ({
                         ...current,
+
                         description: event.target.value,
                       }))
                     }
@@ -601,6 +716,7 @@ export default function DepartmentManagement({
               </div>
 
               {/* Footer */}
+
               <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
                 <button
                   type="button"
@@ -627,6 +743,7 @@ export default function DepartmentManagement({
           </div>
         </div>
       )}
+
       <StatusConfirmModal
         open={statusDepartment !== null}
         entityName={statusDepartment?.name ?? ""}

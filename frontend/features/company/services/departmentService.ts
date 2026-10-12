@@ -25,8 +25,18 @@ export type DepartmentUpdateRequest = {
   is_active: boolean;
 };
 
-type DepartmentListResponse = {
+export type DepartmentQueryParams = {
+  page?: number;
+  page_size?: number;
+  search?: string;
+};
+
+export type PaginatedDepartmentsResponse = {
   departments: Department[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
 };
 
 async function handleResponse<T>(response: Response): Promise<T> {
@@ -35,12 +45,11 @@ async function handleResponse<T>(response: Response): Promise<T> {
 
     try {
       const data = await response.json();
-
       if (typeof data?.detail === "string") {
         message = data.detail;
       }
     } catch {
-      // Keep default message if response is not JSON.
+      // Keep the default message if the response is not JSON.
     }
 
     throw new Error(message);
@@ -53,18 +62,28 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function getDepartments(companyId: number): Promise<Department[]> {
+export async function getDepartments(
+  companyId: number,
+  params: DepartmentQueryParams = {},
+): Promise<PaginatedDepartmentsResponse> {
+  const query = new URLSearchParams({
+    page: String(params.page ?? 1),
+    page_size: String(params.page_size ?? 20),
+  });
+
+  if (params.search?.trim()) {
+    query.set("search", params.search.trim());
+  }
+
   const response = await fetch(
-    `${API_URL}/companies/${companyId}/departments`,
+    `${API_URL}/companies/${companyId}/departments?${query.toString()}`,
     {
       method: "GET",
       credentials: "include",
     },
   );
 
-  const data = await handleResponse<DepartmentListResponse>(response);
-
-  return data.departments;
+  return handleResponse<PaginatedDepartmentsResponse>(response);
 }
 
 export async function getDepartment(
@@ -91,9 +110,7 @@ export async function createDepartment(
     {
       method: "POST",
       credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     },
   );
@@ -111,9 +128,7 @@ export async function updateDepartment(
     {
       method: "PUT",
       credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     },
   );

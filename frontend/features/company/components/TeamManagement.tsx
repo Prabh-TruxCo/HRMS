@@ -86,7 +86,7 @@ export default function TeamManagement({ companyId }: TeamManagementProps) {
         }
 
         setTeams(teamsData);
-        setDepartments(departmentsData);
+        setDepartments(departmentsData.departments);
       } catch (err) {
         if (cancelled) {
           return;
