@@ -17,6 +17,7 @@ from app.api.designations import router as designations_router
 from app.api.clients import router as clients_router
 from app.api.industries import router as industries_router
 from app.api.sites import router as sites_router
+from app.api.posts import router as posts_router
 
 from pathlib import Path
 
@@ -58,6 +59,8 @@ app.include_router(designations_router, prefix="/api")
 app.include_router(clients_router, prefix="/api")
 app.include_router(industries_router, prefix="/api")
 app.include_router(sites_router, prefix="/api")
+app.include_router(posts_router, prefix="/api")
+
 
 @app.get("/")
 def root():

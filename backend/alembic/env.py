@@ -29,6 +29,7 @@ from app.models.client import Client
 from app.models.industry import Industry
 from app.models.company_industry import CompanyIndustry
 from app.models.site import Site
+from app.models.post import Post
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
