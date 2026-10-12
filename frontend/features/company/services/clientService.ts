@@ -17,6 +17,16 @@ export type Client = {
 
 export type ClientListResponse = {
   clients: Client[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+};
+
+export type ClientListParams = {
+  page?: number;
+  page_size?: number;
+  search?: string;
 };
 
 export type ClientPayload = {
@@ -51,15 +61,28 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function getClients(companyId: number): Promise<Client[]> {
-  const response = await fetch(`${API_URL}/companies/${companyId}/clients`, {
-    method: "GET",
-    credentials: "include",
+export async function getClients(
+  companyId: number,
+  params: ClientListParams = {},
+): Promise<ClientListResponse> {
+  const query = new URLSearchParams({
+    page: String(params.page ?? 1),
+    page_size: String(params.page_size ?? 20),
   });
 
-  const data = await handleResponse<ClientListResponse>(response);
+  if (params.search?.trim()) {
+    query.set("search", params.search.trim());
+  }
 
-  return data.clients;
+  const response = await fetch(
+    `${API_URL}/companies/${companyId}/clients?${query.toString()}`,
+    {
+      method: "GET",
+      credentials: "include",
+    },
+  );
+
+  return handleResponse<ClientListResponse>(response);
 }
 
 export async function getClient(

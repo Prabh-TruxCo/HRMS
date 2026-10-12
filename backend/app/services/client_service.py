@@ -1,3 +1,6 @@
+from math import ceil
+
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -21,15 +24,44 @@ def _get_account_id(
 def list_clients(
     db: Session,
     company_id: int,
-) -> list[Client]:
-    return (
-        db.query(Client)
-        .filter(
-            Client.company_id == company_id,
+    *,
+    page: int = 1,
+    page_size: int = 10,
+    search: str | None = None,
+) -> tuple[list[Client], int]:
+    filters = [Client.company_id == company_id]
+
+    search_term = search.strip() if search else ""
+
+    if search_term:
+        pattern = f"%{search_term}%"
+
+        filters.append(
+            or_(
+                Client.name.ilike(pattern),
+                Client.code.ilike(pattern),
+                Client.contact_person.ilike(pattern),
+                Client.phone.ilike(pattern),
+                Client.email.ilike(pattern),
+                Client.city.ilike(pattern),
+                Client.state.ilike(pattern),
+                Client.country.ilike(pattern),
+                Client.description.ilike(pattern),
+            )
         )
-        .order_by(Client.name.asc())
+
+    total = db.query(func.count(Client.id)).filter(*filters).scalar() or 0
+
+    clients = (
+        db.query(Client)
+        .filter(*filters)
+        .order_by(Client.name.asc(), Client.id.asc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
         .all()
     )
+
+    return clients, total
 
 
 def get_client(

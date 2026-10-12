@@ -45,5 +45,11 @@ class ClientResponse(BaseModel):
     is_active: bool
 
 
+
 class ClientListResponse(BaseModel):
     clients: list[ClientResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
