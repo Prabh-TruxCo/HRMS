@@ -143,6 +143,28 @@ export default function CompanyOrganizationTab() {
         [key]: nextValue,
       };
 
+      /*
+       * Organization hierarchy:
+       *
+       * Client
+       *   ↓
+       * Site
+       *   ↓
+       * Post
+       *
+       * Therefore:
+       * - Sites cannot remain enabled when Clients are disabled.
+       * - Posts cannot remain enabled when Sites are disabled.
+       */
+
+      if (key === "clients_enabled" && !nextValue) {
+        updated.sites_enabled = false;
+        updated.posts_enabled = false;
+      }
+
+      if (key === "sites_enabled" && !nextValue) {
+        updated.posts_enabled = false;
+      }
       return updated;
     });
 
