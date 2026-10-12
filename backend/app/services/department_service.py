@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -19,14 +19,41 @@ def _get_account_id(db: Session, company_id: int) -> int:
 def list_departments(
     db: Session,
     company_id: int,
-) -> list[Department]:
+    *,
+    page: int = 1,
+    page_size: int = 10,
+    search: str | None = None,
+) -> tuple[list[Department], int]:
+    filters = [Department.company_id == company_id]
+
+    search_term = search.strip() if search else ""
+
+    if search_term:
+        pattern = f"%{search_term}%"
+        filters.append(
+            or_(
+                Department.name.ilike(pattern),
+                Department.code.ilike(pattern),
+                Department.description.ilike(pattern),
+            )
+        )
+
+    # Count all matching departments before applying pagination.
+    count_statement = select(func.count()).select_from(Department).where(*filters)
+    total = db.scalar(count_statement) or 0
+
+    # Fetch only the requested page.
     statement = (
         select(Department)
-        .where(Department.company_id == company_id)
-        .order_by(Department.name.asc())
+        .where(*filters)
+        .order_by(Department.name.asc(), Department.id.asc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
     )
 
-    return list(db.scalars(statement).all())
+    departments = list(db.scalars(statement).all())
+
+    return departments, total
 
 
 def get_department(

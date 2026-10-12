@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
@@ -49,6 +49,9 @@ def validate_company_membership(
 )
 def get_departments(
     company_id: int,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
+    search: str | None = Query(default=None, max_length=150),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -58,13 +61,22 @@ def get_departments(
         current_user.id,
     )
 
-    departments = list_departments(
+    departments, total = list_departments(
         db,
         company_id,
+        page=page,
+        page_size=page_size,
+        search=search,
     )
+
+    total_pages = (total + page_size - 1) // page_size
 
     return DepartmentListResponse(
         departments=departments,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
     )
 
 

@@ -32,3 +32,7 @@ class DepartmentResponse(BaseModel):
 
 class DepartmentListResponse(BaseModel):
     departments: list[DepartmentResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
