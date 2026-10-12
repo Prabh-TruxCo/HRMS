@@ -62,3 +62,7 @@ class SiteResponse(BaseModel):
 
 class SiteListResponse(BaseModel):
     sites: list[SiteResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int

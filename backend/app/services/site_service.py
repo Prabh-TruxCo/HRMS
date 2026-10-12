@@ -1,4 +1,6 @@
+from math import ceil
 
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -42,13 +44,51 @@ def _validate_client(
     return client
 
 
-def list_sites(db: Session, company_id: int) -> list[Site]:
-    return (
+def list_sites(
+    db: Session,
+    company_id: int,
+    *,
+    page: int = 1,
+    page_size: int = 10,
+    search: str | None = None,
+) -> tuple[list[Site], int]:
+    query = (
         db.query(Site)
+        .outerjoin(Client, Site.client_id == Client.id)
         .filter(Site.company_id == company_id)
-        .order_by(Site.name.asc())
+    )
+
+    if search and search.strip():
+        term = f"%{search.strip()}%"
+
+        query = query.filter(
+            or_(
+                Site.name.ilike(term),
+                Site.code.ilike(term),
+                Site.site_type.ilike(term),
+                Site.description.ilike(term),
+                Site.address.ilike(term),
+                Site.city.ilike(term),
+                Site.state.ilike(term),
+                Site.country.ilike(term),
+                Site.postal_code.ilike(term),
+                Site.contact_person.ilike(term),
+                Site.phone.ilike(term),
+                Site.email.ilike(term),
+                Client.name.ilike(term),
+            )
+        )
+
+    total = query.count()
+
+    sites = (
+        query.order_by(Site.name.asc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
         .all()
     )
+
+    return sites, total
 
 
 def get_site(

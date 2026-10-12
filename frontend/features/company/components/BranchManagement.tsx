@@ -320,25 +320,27 @@ export default function BranchManagement() {
 
   return (
     <>
-      <div className="space-y-5 p-5 sm:p-6 lg:p-7">
+      <div className="space-y-4 p-4 sm:p-5 lg:p-6">
+        {/* Page header */}
+
         {/* Page header */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
+            <h1 className="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
               Branches
             </h1>
-
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              Manage the branches or locations belonging to this company.
+            <p className="mt-0.5 text-sm text-[var(--text-secondary)]">
+              Manage company branches and locations.
             </p>
           </div>
 
           <button
             type="button"
             onClick={openCreateModal}
-            className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-color)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[var(--brand-color-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-color)] focus:ring-offset-2"
+            className="inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-lg bg-[var(--brand-color)] px-3.5 py-2 text-sm font-medium text-white transition hover:bg-[var(--brand-color-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-color)] focus:ring-offset-2"
           >
-            + Add Branch
+            <span className="text-base leading-none">+</span>
+            Add Branch
           </button>
         </div>
 
@@ -354,17 +356,16 @@ export default function BranchManagement() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative w-full sm:max-w-sm">
             <Search
-              size={17}
+              size={16}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
             />
-
             <input
               type="search"
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
               placeholder="Search branches..."
               aria-label="Search branches"
-              className="min-h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] pl-9 pr-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--brand-color)] focus:ring-2 focus:ring-[var(--brand-color-soft)]"
+              className="min-h-9 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] pl-9 pr-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--brand-color)] focus:ring-2 focus:ring-[var(--brand-color-soft)]"
             />
           </div>
 
@@ -408,7 +409,7 @@ export default function BranchManagement() {
             {/* Only the table scrolls; the pagination footer stays outside this area. */}
             <div className="h-[clamp(220px,calc(100dvh-360px),760px)] overflow-x-auto overflow-y-auto overscroll-contain">
               <table className="w-full min-w-[760px]">
-                <thead className="sticky top-0 z-10">
+                <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
                   <tr className="border-b border-[var(--border)] bg-[var(--surface-muted)] text-left">
                     <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
                       Branch

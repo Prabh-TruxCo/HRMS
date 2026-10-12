@@ -1,20 +1,30 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from "react";
 import {
   Activity,
+  Building2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   MapPin,
   Pencil,
   Plus,
   Power,
   Search,
-  Building2,
   X,
 } from "lucide-react";
 
 import {
   Site,
   SitePayload,
+  SiteListResponse,
   createSite,
   getSites,
   updateSite,
@@ -30,6 +40,17 @@ import {
 
 type SiteManagementProps = {
   companyId: number | null;
+};
+
+type ClientDetails = {
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  postal_code?: string | null;
+  contact_person?: string | null;
+  phone?: string | null;
+  email?: string | null;
 };
 
 const emptyForm: SitePayload = {
@@ -50,28 +71,55 @@ const emptyForm: SitePayload = {
 };
 
 const inputClass =
-  "h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--brand-color)]";
+  "h-9 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--brand-color)]";
 
-const labelClass =
-  "mb-1.5 block text-sm font-medium text-[var(--text-primary)]";
+const labelClass = "mb-1 block text-xs font-medium text-[var(--text-primary)]";
 
-const textareaClass =
-  "w-full resize-none rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--brand-color)]";
+function clientDefaults(client: Client): Partial<SitePayload> {
+  const details = client as Client & ClientDetails;
+
+  return {
+    address: details.address ?? "",
+    city: details.city ?? "",
+    state: details.state ?? "",
+    country: details.country ?? "India",
+    postal_code: details.postal_code ?? "",
+    contact_person: details.contact_person ?? "",
+    phone: details.phone ?? "",
+    email: details.email ?? "",
+  };
+}
 
 export default function SiteManagement({ companyId }: SiteManagementProps) {
   const { showSnackbar } = useSnackbar();
 
   const [sites, setSites] = useState<Site[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [clientResults, setClientResults] = useState<Client[]>([]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [pagination, setPagination] = useState<SiteListResponse>({
+    sites: [],
+    total: 0,
+    page: 1,
+    page_size: 10,
+    total_pages: 0,
+  });
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSite, setEditingSite] = useState<Site | null>(null);
   const [form, setForm] = useState<SitePayload>(emptyForm);
   const [saving, setSaving] = useState(false);
+
+  const [clientSearch, setClientSearch] = useState("");
+  const [clientPickerOpen, setClientPickerOpen] = useState(false);
+  const [clientLoading, setClientLoading] = useState(false);
 
   const [statusSite, setStatusSite] = useState<Site | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
@@ -81,6 +129,60 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
   const [activityLoading, setActivityLoading] = useState(false);
   const [activityError, setActivityError] = useState<string | null>(null);
 
+  // Debounce the sites search to avoid making a request on every keystroke.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const loadSites = useCallback(
+    async (signal?: AbortSignal) => {
+      if (companyId === null) return;
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        const result = await getSites(companyId, {
+          page,
+          page_size: pageSize,
+          search: debouncedSearch,
+        });
+
+        if (signal?.aborted) return;
+
+        setSites(result.sites);
+        setPagination(result);
+      } catch (err) {
+        if (signal?.aborted) return;
+
+        setError(err instanceof Error ? err.message : "Unable to load sites.");
+      } finally {
+        if (!signal?.aborted) {
+          setLoading(false);
+        }
+      }
+    },
+    [companyId, page, pageSize, debouncedSearch],
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const timer = setTimeout(() => {
+      void loadSites(controller.signal);
+    }, 0);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [loadSites]);
+
+  // Load clients for table labels and the initial client selector.
   useEffect(() => {
     if (companyId === null) {
       return;
@@ -89,37 +191,82 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
     let cancelled = false;
     const activeCompanyId = companyId;
 
-    async function loadData() {
+    async function loadClients() {
       try {
-        setLoading(true);
-        setError(null);
+        const result = await getClients(activeCompanyId, {
+          page: 1,
+          page_size: 30,
+        });
 
-        const [siteData, clientData] = await Promise.all([
-          getSites(activeCompanyId),
-          getClients(activeCompanyId),
-        ]);
-
-        if (cancelled) return;
-
-        setSites(siteData);
-        setClients(clientData);
-      } catch (err) {
-        if (cancelled) return;
-
-        setError(err instanceof Error ? err.message : "Unable to load sites.");
-      } finally {
         if (!cancelled) {
-          setLoading(false);
+          setClients(result.clients);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          showSnackbar(
+            err instanceof Error ? err.message : "Unable to load clients.",
+            "error",
+          );
         }
       }
     }
 
-    void loadData();
+    void loadClients();
 
     return () => {
       cancelled = true;
     };
-  }, [companyId]);
+  }, [companyId, showSnackbar]);
+
+  // Search clients from the API, so the selector also works with
+  // companies that have more clients than the initial page.
+  useEffect(() => {
+    if (!modalOpen || companyId === null) return;
+
+    let cancelled = false;
+
+    const timer = setTimeout(async () => {
+      try {
+        setClientLoading(true);
+
+        const result = await getClients(companyId, {
+          page: 1,
+          page_size: 20,
+          search: clientSearch.trim() || undefined,
+        });
+
+        if (cancelled) return;
+
+        setClientResults(result.clients);
+
+        setClients((current) => {
+          const merged = new Map(current.map((client) => [client.id, client]));
+
+          result.clients.forEach((client) => {
+            merged.set(client.id, client);
+          });
+
+          return Array.from(merged.values());
+        });
+      } catch (err) {
+        if (!cancelled) {
+          showSnackbar(
+            err instanceof Error ? err.message : "Unable to search clients.",
+            "error",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setClientLoading(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [companyId, modalOpen, clientSearch, showSnackbar]);
 
   const clientNames = useMemo(
     () => new Map(clients.map((client) => [client.id, client.name])),
@@ -131,31 +278,30 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
     [clients],
   );
 
-  const filteredSites = useMemo(() => {
-    const value = search.trim().toLowerCase();
+  const selectableClients = useMemo(
+    () =>
+      clientResults.filter(
+        (client) =>
+          client.is_active ||
+          (editingSite !== null && client.id === editingSite.client_id),
+      ),
+    [clientResults, editingSite],
+  );
 
-    if (!value) return sites;
+  const totalPages = pagination.total_pages;
+  const firstRow = pagination.total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const lastRow = Math.min(page * pageSize, pagination.total);
 
-    return sites.filter((site) => {
-      const clientName = clientNames.get(site.client_id) ?? "";
+  function selectClient(client: Client) {
+    setForm((current) => ({
+      ...current,
+      client_id: client.id,
+      ...clientDefaults(client),
+    }));
 
-      return [
-        site.name,
-        site.code,
-        site.site_type,
-        site.address,
-        site.city,
-        site.state,
-        site.country,
-        site.contact_person,
-        site.phone,
-        site.email,
-        clientName,
-      ]
-        .filter(Boolean)
-        .some((field) => String(field).toLowerCase().includes(value));
-    });
-  }, [sites, search, clientNames]);
+    setClientSearch(client.name);
+    setClientPickerOpen(false);
+  }
 
   function openCreateModal() {
     if (activeClients.length === 0) {
@@ -166,9 +312,10 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
     setEditingSite(null);
     setForm({
       ...emptyForm,
-      client_id: activeClients[0].id,
-      is_active: true,
+      client_id: 0,
     });
+    setClientSearch("");
+    setClientPickerOpen(false);
     setModalOpen(true);
   }
 
@@ -192,6 +339,10 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
       is_active: site.is_active,
     });
 
+    const client = clients.find((item) => item.id === site.client_id);
+
+    setClientSearch(client?.name ?? "");
+    setClientPickerOpen(false);
     setModalOpen(true);
   }
 
@@ -201,6 +352,8 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
     setModalOpen(false);
     setEditingSite(null);
     setForm(emptyForm);
+    setClientSearch("");
+    setClientPickerOpen(false);
   }
 
   function updateField(
@@ -219,7 +372,7 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
       name: form.name.trim(),
       code: form.code?.trim() || null,
       site_type: form.site_type?.trim() || null,
-      address: form.address?.trim() ?? "",
+      address: form.address?.trim() || "",
       city: form.city?.trim() || null,
       state: form.state?.trim() || null,
       country: form.country?.trim() || "India",
@@ -232,18 +385,30 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
     };
   }
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (companyId === null) return;
 
-    if (!form.client_id || !form.name?.trim() || !form.address?.trim()) {
-      showSnackbar("Client, site name, and address are required.", "error");
+    const selectedClient = clients.find(
+      (client) => client.id === Number(form.client_id),
+    );
+
+    if (!selectedClient) {
+      showSnackbar("Please select a valid client.", "error");
       return;
     }
 
-    if (!clients.some((client) => client.id === Number(form.client_id))) {
-      showSnackbar("Select a valid client.", "error");
+    if (!editingSite && !selectedClient.is_active) {
+      showSnackbar(
+        "An inactive client cannot be assigned to a new site.",
+        "error",
+      );
+      return;
+    }
+
+    if (!form.name?.trim() || !form.address?.trim()) {
+      showSnackbar("Site name and address are required.", "error");
       return;
     }
 
@@ -251,29 +416,23 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
       setSaving(true);
 
       const payload = buildPayload();
-      let result: Site;
 
       if (editingSite) {
-        result = await updateSite(companyId, editingSite.id, payload);
-
-        setSites((current) =>
-          current.map((item) => (item.id === result.id ? result : item)),
-        );
-
+        await updateSite(companyId, editingSite.id, payload);
         showSnackbar("Site updated successfully.", "success");
       } else {
-        result = await createSite(companyId, payload);
-
-        setSites((current) =>
-          [...current, result].sort((a, b) => a.name.localeCompare(b.name)),
-        );
-
+        await createSite(companyId, payload);
         showSnackbar("Site created successfully.", "success");
       }
 
       setModalOpen(false);
       setEditingSite(null);
       setForm(emptyForm);
+      setClientSearch("");
+      setClientPickerOpen(false);
+
+      // Refresh the current page and total count from the server.
+      await loadSites();
     } catch (err) {
       showSnackbar(
         err instanceof Error ? err.message : "Unable to save site.",
@@ -290,39 +449,34 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
     try {
       setStatusLoading(true);
 
-      // The Sites API uses PUT for updates; it does not use the
-      // Clients module's separate PATCH /status endpoint.
       const payload: SitePayload = {
         client_id: statusSite.client_id,
         name: statusSite.name,
-        code: statusSite.code ?? null,
-        site_type: statusSite.site_type ?? null,
+        code: statusSite.code,
+        site_type: statusSite.site_type,
         address: statusSite.address,
-        city: statusSite.city ?? null,
-        state: statusSite.state ?? null,
-        country: statusSite.country ?? "India",
-        postal_code: statusSite.postal_code ?? null,
-        contact_person: statusSite.contact_person ?? null,
-        phone: statusSite.phone ?? null,
-        email: statusSite.email ?? null,
-        description: statusSite.description ?? null,
+        city: statusSite.city,
+        state: statusSite.state,
+        country: statusSite.country,
+        postal_code: statusSite.postal_code,
+        contact_person: statusSite.contact_person,
+        phone: statusSite.phone,
+        email: statusSite.email,
+        description: statusSite.description,
         is_active: !statusSite.is_active,
       };
 
-      const result = await updateSite(companyId, statusSite.id, payload);
-
-      setSites((current) =>
-        current.map((item) => (item.id === result.id ? result : item)),
-      );
+      await updateSite(companyId, statusSite.id, payload);
 
       showSnackbar(
-        result.is_active
-          ? "Site enabled successfully."
-          : "Site disabled successfully.",
+        statusSite.is_active
+          ? "Site disabled successfully."
+          : "Site enabled successfully.",
         "success",
       );
 
       setStatusSite(null);
+      await loadSites();
     } catch (err) {
       showSnackbar(
         err instanceof Error ? err.message : "Unable to update site status.",
@@ -359,138 +513,158 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
   }
 
   return (
-    <div className="space-y-5 p-4 sm:p-6 lg:p-8">
-      {" "}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        {" "}
+    <div className="space-y-4 p-4 sm:p-6">
+      <div className="flex flex-col gap-3 border-b border-[var(--border)] pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          {" "}
           <div className="flex items-center gap-2">
-            {" "}
-            <Building2 size={20} className="text-[var(--brand-color)]" />{" "}
-            <h1 className="text-xl font-semibold text-[var(--text-primary)]">
-              Sites{" "}
-            </h1>{" "}
+            <Building2 size={19} className="text-[var(--brand-color)]" />
+            <h1 className="text-base font-semibold text-[var(--text-primary)]">
+              Sites
+            </h1>
           </div>
-          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+          <p className="mt-1 text-xs text-[var(--text-secondary)]">
             Manage client locations and site information.
           </p>
         </div>
+
         <button
           type="button"
           onClick={openCreateModal}
           disabled={companyId === null || activeClients.length === 0}
-          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[var(--brand-color)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[var(--brand-color-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-[var(--brand-color)] px-3 text-sm font-medium text-white hover:bg-[var(--brand-color-hover)] disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <Plus size={16} />
+          <Plus size={15} />
           Add Site
         </button>
       </div>
+
       {companyId !== null && !loading && activeClients.length === 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
           No active clients are available. Create or enable a client before
           adding a site.
         </div>
       )}
-      <div className="flex items-center gap-3">
-        <div className="relative w-full max-w-sm">
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative w-full sm:max-w-sm">
           <Search
-            size={16}
+            size={15}
             className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
           />
           <input
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setPage(1);
+            }}
             placeholder="Search sites, clients, or locations..."
             className={`${inputClass} pl-9`}
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              title="Clear search"
+              className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
+
+        <p className="text-xs text-[var(--text-secondary)]">
+          {pagination.total} {pagination.total === 1 ? "site" : "sites"}
+        </p>
       </div>
-      <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+
+      <div className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]">
         {error ? (
-          <div className="px-5 py-10 text-center text-sm text-red-600">
-            {error}
+          <div className="px-4 py-10 text-center">
+            <p className="text-sm text-red-600">{error}</p>
+            <button
+              type="button"
+              onClick={() => void loadSites()}
+              className="mt-3 rounded-md border border-[var(--border)] px-3 py-1.5 text-xs hover:bg-[var(--surface-muted)]"
+            >
+              Retry
+            </button>
           </div>
         ) : loading ? (
-          <div className="px-5 py-10 text-center text-sm text-[var(--text-secondary)]">
+          <div className="px-4 py-10 text-center text-sm text-[var(--text-secondary)]">
             Loading sites...
           </div>
-        ) : filteredSites.length === 0 ? (
-          <div className="px-5 py-12 text-center">
-            <Building2 size={28} className="mx-auto text-[var(--text-muted)]" />
-
+        ) : sites.length === 0 ? (
+          <div className="px-4 py-12 text-center">
+            <Building2 size={26} className="mx-auto text-[var(--text-muted)]" />
             <p className="mt-3 text-sm font-medium text-[var(--text-primary)]">
-              {search ? "No sites found" : "No sites yet"}
+              {debouncedSearch ? "No sites found" : "No sites yet"}
             </p>
-
             <p className="mt-1 text-xs text-[var(--text-secondary)]">
-              {search
-                ? "Try a different search."
+              {debouncedSearch
+                ? "Try a different search term."
                 : "Add a site to start managing client locations."}
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--surface-muted)] text-left">
-                  <th className="px-5 py-3 font-medium text-[var(--text-secondary)]">
-                    Site
-                  </th>
-                  <th className="px-5 py-3 font-medium text-[var(--text-secondary)]">
-                    Client
-                  </th>
-                  <th className="px-5 py-3 font-medium text-[var(--text-secondary)]">
-                    Location
-                  </th>
-                  <th className="px-5 py-3 font-medium text-[var(--text-secondary)]">
-                    Contact
-                  </th>
-                  <th className="px-5 py-3 font-medium text-[var(--text-secondary)]">
-                    Code
-                  </th>
-                  <th className="px-5 py-3 font-medium text-[var(--text-secondary)]">
-                    Status
-                  </th>
-                  <th className="px-5 py-3 text-right font-medium text-[var(--text-secondary)]">
-                    Actions
-                  </th>
+          <div className="h-[clamp(220px,calc(100dvh-360px),760px)] overflow-auto">
+            <table className="w-full min-w-[950px] text-left text-xs">
+               <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
+                <tr className="border-b border-[var(--border)]">
+                  {[
+                    "Site",
+                    "Client",
+                    "Location",
+                    "Contact",
+                    "Code",
+                    "Status",
+                    "Actions",
+                  ].map((heading) => (
+                    <th
+                      key={heading}
+                      className={`px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] ${
+                        heading === "Actions" ? "text-right" : ""
+                      }`}
+                    >
+                      {heading}
+                    </th>
+                  ))}
                 </tr>
               </thead>
 
               <tbody>
-                {filteredSites.map((site) => (
+                {sites.map((site) => (
                   <tr
                     key={site.id}
-                    className={`border-b border-[var(--border)] last:border-0 ${
+                    className={`border-b border-[var(--border)] last:border-0 hover:bg-[var(--surface-muted)]/50 ${
                       site.is_active ? "" : "opacity-60"
                     }`}
                   >
-                    <td className="px-5 py-4">
+                    <td className="px-3 py-2.5">
                       <div className="font-medium text-[var(--text-primary)]">
                         {site.name}
                       </div>
                       {site.site_type && (
-                        <div className="mt-0.5 text-xs text-[var(--text-muted)]">
+                        <div className="mt-0.5 text-[11px] text-[var(--text-muted)]">
                           {site.site_type}
                         </div>
                       )}
                     </td>
 
-                    <td className="px-5 py-4 text-[var(--text-primary)]">
-                      {clientNames.get(site.client_id) ?? "Unknown client"}
+                    <td className="px-3 py-2.5 text-[var(--text-primary)]">
+                      {clientNames.get(site.client_id) ??
+                        `Client #${site.client_id}`}
                     </td>
 
-                    <td className="px-5 py-4">
+                    <td className="max-w-[230px] px-3 py-2.5">
                       <div className="flex items-start gap-1.5 text-[var(--text-primary)]">
                         <MapPin
-                          size={14}
+                          size={13}
                           className="mt-0.5 shrink-0 text-[var(--text-muted)]"
                         />
-                        <div>
+                        <div className="min-w-0">
                           <div>{formatLocation(site) || "—"}</div>
                           {site.address && (
-                            <div className="mt-0.5 max-w-xs truncate text-xs text-[var(--text-muted)]">
+                            <div className="mt-0.5 truncate text-[11px] text-[var(--text-muted)]">
                               {site.address}
                             </div>
                           )}
@@ -498,29 +672,29 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
                       </div>
                     </td>
 
-                    <td className="px-5 py-4">
+                    <td className="px-3 py-2.5">
                       <div className="text-[var(--text-primary)]">
                         {site.contact_person || "—"}
                       </div>
                       {site.email && (
-                        <div className="mt-0.5 text-xs text-[var(--text-muted)]">
+                        <div className="mt-0.5 text-[11px] text-[var(--text-muted)]">
                           {site.email}
                         </div>
                       )}
                       {site.phone && (
-                        <div className="text-xs text-[var(--text-muted)]">
+                        <div className="text-[11px] text-[var(--text-muted)]">
                           {site.phone}
                         </div>
                       )}
                     </td>
 
-                    <td className="px-5 py-4 text-[var(--text-secondary)]">
+                    <td className="px-3 py-2.5 text-[var(--text-secondary)]">
                       {site.code || "—"}
                     </td>
 
-                    <td className="px-5 py-4">
+                    <td className="px-3 py-2.5">
                       <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                        className={`inline-flex rounded-full px-2 py-1 text-[10px] font-medium ${
                           site.is_active
                             ? "bg-emerald-50 text-emerald-700"
                             : "bg-gray-100 text-gray-500"
@@ -530,33 +704,35 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
                       </span>
                     </td>
 
-                    <td className="px-5 py-4">
+                    <td className="px-3 py-2.5">
                       <div className="flex justify-end gap-1">
                         <button
                           type="button"
-                          title="Edit"
+                          title="Edit site"
                           onClick={() => openEditModal(site)}
-                          className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-secondary)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]"
+                          className="flex h-7 w-7 items-center justify-center rounded text-[var(--text-secondary)] hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]"
                         >
-                          <Pencil size={16} />
+                          <Pencil size={14} />
                         </button>
 
                         <button
                           type="button"
-                          title={site.is_active ? "Disable" : "Enable"}
+                          title={
+                            site.is_active ? "Disable site" : "Enable site"
+                          }
                           onClick={() => setStatusSite(site)}
-                          className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-secondary)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]"
+                          className="flex h-7 w-7 items-center justify-center rounded text-[var(--text-secondary)] hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]"
                         >
-                          <Power size={16} />
+                          <Power size={14} />
                         </button>
 
                         <button
                           type="button"
-                          title="Activity"
+                          title="View activity"
                           onClick={() => void openActivity(site)}
-                          className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-secondary)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]"
+                          className="flex h-7 w-7 items-center justify-center rounded text-[var(--text-secondary)] hover:bg-[var(--surface-muted)] hover:text-[var(--text-primary)]"
                         >
-                          <Activity size={16} />
+                          <Activity size={14} />
                         </button>
                       </div>
                     </td>
@@ -566,19 +742,75 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
             </table>
           </div>
         )}
+
+        <div className="flex flex-col gap-3 border-t border-[var(--border)] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-secondary)]">
+            <span>
+              {firstRow}–{lastRow} of {pagination.total}
+            </span>
+            <span>·</span>
+            <label htmlFor="site-page-size">Rows</label>
+            <select
+              id="site-page-size"
+              value={pageSize}
+              onChange={(event) => {
+                setPageSize(Number(event.target.value));
+                setPage(1);
+              }}
+              className="h-7 rounded border border-[var(--border)] bg-[var(--surface)] px-2 text-xs text-[var(--text-primary)]"
+            >
+              {[10, 20, 50, 100].map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              disabled={page <= 1 || loading}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              className="flex h-7 items-center gap-1 rounded border border-[var(--border)] px-2 text-xs text-[var(--text-primary)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <ChevronLeft size={14} />
+              Previous
+            </button>
+
+            <span className="min-w-16 text-center text-xs text-[var(--text-secondary)]">
+              Page {page} of {Math.max(totalPages, 1)}
+            </span>
+
+            <button
+              type="button"
+              disabled={loading || totalPages === 0 || page >= totalPages}
+              onClick={() =>
+                setPage((current) =>
+                  Math.min(Math.max(totalPages, 1), current + 1),
+                )
+              }
+              className="flex h-7 items-center gap-1 rounded border border-[var(--border)] px-2 text-xs text-[var(--text-primary)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
       </div>
+
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-[var(--surface)] shadow-xl">
-            <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-5">
+          <div className="max-h-[92dvh] w-full max-w-3xl overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3 sm:px-5">
               <div>
                 <h2 className="text-base font-semibold text-[var(--text-primary)]">
                   {editingSite ? "Edit Site" : "Add Site"}
                 </h2>
                 <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
                   {editingSite
-                    ? "Update site and contact information."
-                    : "Add a location for one of your clients."}
+                    ? "Update this site's details."
+                    : "Choose a client and add its site details."}
                 </p>
               </div>
 
@@ -586,36 +818,93 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
                 type="button"
                 onClick={closeModal}
                 disabled={saving}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--surface-muted)] disabled:opacity-50"
+                title="Close"
+                className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--surface-muted)] disabled:opacity-50"
               >
-                <X size={18} />
+                <X size={17} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5 px-6 py-5">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="sm:col-span-2">
+            <form onSubmit={handleSubmit} className="space-y-4 p-4 sm:p-5">
+              <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
+                <div className="relative sm:col-span-2">
                   <label className={labelClass}>Client *</label>
-                  <select
-                    value={form.client_id || ""}
-                    onChange={(event) =>
-                      updateField("client_id", Number(event.target.value))
-                    }
-                    required
-                    className={inputClass}
-                  >
-                    <option value="" disabled>
-                      Select a client
-                    </option>
-                    {clients.map((client) => (
-                      <option key={client.id} value={client.id}>
-                        {client.name}
-                        {!client.is_active ? " (Inactive)" : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-1 text-xs text-[var(--text-muted)]">
-                    Each site belongs to one client.
+
+                  <div className="relative">
+                    <Search
+                      size={15}
+                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
+                    />
+
+                    <input
+                      value={clientSearch}
+                      onFocus={() => setClientPickerOpen(true)}
+                      onChange={(event) => {
+                        setClientSearch(event.target.value);
+                        setClientPickerOpen(true);
+
+                        setForm((current) => ({
+                          ...current,
+                          client_id: 0,
+                        }));
+                      }}
+                      placeholder="Type a client name to search..."
+                      autoComplete="off"
+                      required
+                      className={`${inputClass} pl-9 pr-9`}
+                    />
+
+                    <ChevronDown
+                      size={15}
+                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
+                    />
+                  </div>
+
+                  {clientPickerOpen && (
+                    <div className="absolute z-30 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-lg">
+                      {clientLoading ? (
+                        <p className="px-3 py-3 text-xs text-[var(--text-secondary)]">
+                          Searching clients...
+                        </p>
+                      ) : selectableClients.length === 0 ? (
+                        <p className="px-3 py-3 text-xs text-[var(--text-secondary)]">
+                          No matching active clients found.
+                        </p>
+                      ) : (
+                        selectableClients.map((client) => {
+                          const details = client as Client & ClientDetails;
+
+                          return (
+                            <button
+                              key={client.id}
+                              type="button"
+                              onClick={() => selectClient(client)}
+                              className="flex w-full items-start gap-2 border-b border-[var(--border)] px-3 py-2.5 text-left last:border-0 hover:bg-[var(--surface-muted)]"
+                            >
+                              <Building2
+                                size={15}
+                                className="mt-0.5 shrink-0 text-[var(--text-secondary)]"
+                              />
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm font-medium text-[var(--text-primary)]">
+                                  {client.name}
+                                </span>
+                                <span className="mt-0.5 block truncate text-[11px] text-[var(--text-secondary)]">
+                                  {[details.city, details.state]
+                                    .filter(Boolean)
+                                    .join(", ") || "No location saved"}
+                                </span>
+                              </span>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+
+                  <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                    Selecting a client copies its address and contact details.
+                    You can edit those details for this site.
                   </p>
                 </div>
 
@@ -626,8 +915,8 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
                     onChange={(event) =>
                       updateField("name", event.target.value)
                     }
-                    required
                     maxLength={200}
+                    required
                     className={inputClass}
                   />
                 </div>
@@ -652,13 +941,13 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
                       updateField("site_type", event.target.value)
                     }
                     maxLength={100}
-                    placeholder="e.g. Office, Warehouse, Plant"
+                    placeholder="Office, warehouse, plant..."
                     className={inputClass}
                   />
                 </div>
 
                 <div>
-                  <label className={labelClass}>Contact Person</label>
+                  <label className={labelClass}>Contact Person *</label>
                   <input
                     value={form.contact_person ?? ""}
                     onChange={(event) =>
@@ -701,9 +990,9 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
                     onChange={(event) =>
                       updateField("address", event.target.value)
                     }
-                    required
                     rows={2}
-                    className={textareaClass}
+                    required
+                    className="w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--brand-color)]"
                   />
                 </div>
 
@@ -738,8 +1027,8 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
                     onChange={(event) =>
                       updateField("country", event.target.value)
                     }
-                    required
                     maxLength={100}
+                    required
                     className={inputClass}
                   />
                 </div>
@@ -763,14 +1052,14 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
                     onChange={(event) =>
                       updateField("description", event.target.value)
                     }
-                    rows={3}
-                    className={textareaClass}
+                    rows={2}
+                    className="w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--brand-color)]"
                   />
                 </div>
               </div>
 
               {!editingSite && (
-                <label className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
+                <label className="flex items-center gap-2 text-xs text-[var(--text-primary)]">
                   <input
                     type="checkbox"
                     checked={form.is_active !== false}
@@ -783,20 +1072,20 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
                 </label>
               )}
 
-              <div className="flex flex-col-reverse gap-2 border-t border-[var(--border)] pt-4 sm:flex-row sm:justify-end">
+              <div className="flex flex-col-reverse gap-2 border-t border-[var(--border)] pt-3 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={closeModal}
                   disabled={saving}
-                  className="min-h-10 rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--surface-muted)] disabled:opacity-50"
+                  className="h-9 rounded-md border border-[var(--border)] px-4 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--surface-muted)] disabled:opacity-50"
                 >
                   Cancel
                 </button>
 
                 <button
                   type="submit"
-                  disabled={saving}
-                  className="min-h-10 rounded-lg bg-[var(--brand-color)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--brand-color-hover)] disabled:opacity-50"
+                  disabled={saving || form.client_id === 0}
+                  className="h-9 rounded-md bg-[var(--brand-color)] px-4 text-sm font-medium text-white hover:bg-[var(--brand-color-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {saving
                     ? "Saving..."
@@ -809,6 +1098,7 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
           </div>
         </div>
       )}
+
       <StatusConfirmModal
         open={statusSite !== null}
         entityName={statusSite?.name ?? ""}
@@ -818,6 +1108,7 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
         onConfirm={handleStatusConfirm}
         onClose={() => (statusLoading ? undefined : setStatusSite(null))}
       />
+
       {activitySite && companyId !== null && (
         <AuditLogModal
           open

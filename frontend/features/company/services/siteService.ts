@@ -23,6 +23,16 @@ export type Site = {
 
 export type SiteListResponse = {
   sites: Site[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+};
+
+export type SiteListParams = {
+  page?: number;
+  page_size?: number;
+  search?: string;
 };
 
 export type SitePayload = {
@@ -44,15 +54,22 @@ export type SitePayload = {
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    let message = "Something went wrong.";
+    let message = `Request failed (${response.status}).`;
 
     try {
       const data = await response.json();
 
       if (typeof data?.detail === "string") {
         message = data.detail;
+      } else if (Array.isArray(data?.detail)) {
+        message = data.detail
+          .map((item: { msg?: string }) => item.msg ?? "")
+          .filter(Boolean)
+          .join(", ");
       }
-    } catch {}
+    } catch {
+      // Keep the default error message if the response isn't JSON.
+    }
 
     throw new Error(message);
   }
@@ -60,15 +77,30 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function getSites(companyId: number): Promise<Site[]> {
-  const response = await fetch(`${API_URL}/companies/${companyId}/sites`, {
-    method: "GET",
-    credentials: "include",
+export async function getSites(
+  companyId: number,
+  params: SiteListParams = {},
+): Promise<SiteListResponse> {
+  const query = new URLSearchParams({
+    page: String(params.page ?? 1),
+    page_size: String(params.page_size ?? 20),
   });
 
-  const data = await handleResponse<SiteListResponse>(response);
+  const search = params.search?.trim();
 
-  return data.sites;
+  if (search) {
+    query.set("search", search);
+  }
+
+  const response = await fetch(
+    `${API_URL}/companies/${companyId}/sites?${query.toString()}`,
+    {
+      method: "GET",
+      credentials: "include",
+    },
+  );
+
+  return handleResponse<SiteListResponse>(response);
 }
 
 export async function getSite(

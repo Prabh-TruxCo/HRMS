@@ -1,3 +1,6 @@
+from math import ceil
+
+from fastapi import Query
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -48,12 +51,29 @@ def validate_company_membership(
 @router.get("", response_model=SiteListResponse)
 def get_sites(
     company_id: int,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
+    search: str | None = Query(None, max_length=150),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
     validate_company_membership(db, company_id, current_user)
 
-    return {"sites": list_sites(db, company_id)}
+    sites, total = list_sites(
+        db,
+        company_id,
+        page=page,
+        page_size=page_size,
+        search=search,
+    )
+
+    return {
+        "sites": sites,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": ceil(total / page_size) if total else 0,
+    }
 
 
 @router.get("/{site_id}", response_model=SiteResponse)
