@@ -1,3 +1,4 @@
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -20,3 +21,11 @@ class DesignationResponse(DesignationBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+
+
+class DesignationListResponse(BaseModel):
+    designations: list[DesignationResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int

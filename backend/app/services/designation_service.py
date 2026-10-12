@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -22,14 +22,46 @@ def _get_account_id(
 def list_designations(
     db: Session,
     company_id: int,
-) -> list[Designation]:
+    *,
+    page: int = 1,
+    page_size: int = 10,
+    search: str | None = None,
+) -> tuple[list[Designation], int]:
+    filters = [Designation.company_id == company_id]
+
+    search_term = search.strip() if search else ""
+
+    if search_term:
+        pattern = f"%{search_term}%"
+
+        filters.append(
+            or_(
+                Designation.name.ilike(pattern),
+                Designation.code.ilike(pattern),
+                Designation.description.ilike(pattern),
+            )
+        )
+
+    # Count all matching designations.
+    count_statement = select(func.count()).select_from(Designation).where(*filters)
+
+    total = db.scalar(count_statement) or 0
+
+    # Fetch only the requested page.
     statement = (
         select(Designation)
-        .where(Designation.company_id == company_id)
-        .order_by(Designation.name.asc())
+        .where(*filters)
+        .order_by(
+            Designation.name.asc(),
+            Designation.id.asc(),
+        )
+        .offset((page - 1) * page_size)
+        .limit(page_size)
     )
 
-    return list(db.scalars(statement).all())
+    designations = list(db.scalars(statement).all())
+
+    return designations, total
 
 
 def get_designation(
@@ -95,9 +127,7 @@ def create_designation(
 
     except IntegrityError:
         db.rollback()
-        raise ValueError(
-            "A designation with this name already exists."
-        )
+        raise ValueError("A designation with this name already exists.")
 
     return designation
 
@@ -120,11 +150,7 @@ def update_designation(
 
     designation.name = name.strip()
     designation.code = code.strip() if code else None
-    designation.description = (
-        description.strip()
-        if description
-        else None
-    )
+    designation.description = description.strip() if description else None
 
     new_values = {
         "name": designation.name,
@@ -149,9 +175,7 @@ def update_designation(
             entity_type="DESIGNATION",
             entity_id=designation.id,
             action="UPDATED",
-            description=(
-                f"Designation '{designation.name}' was updated."
-            ),
+            description=(f"Designation '{designation.name}' was updated."),
             old_values=old_values,
             new_values=new_values,
         )
@@ -161,9 +185,7 @@ def update_designation(
 
     except IntegrityError:
         db.rollback()
-        raise ValueError(
-            "A designation with this name already exists."
-        )
+        raise ValueError("A designation with this name already exists.")
 
     return designation
 
@@ -220,8 +242,6 @@ def update_designation_status(
 
     except IntegrityError:
         db.rollback()
-        raise ValueError(
-            "Unable to update designation status."
-        )
+        raise ValueError("Unable to update designation status.")
 
     return designation

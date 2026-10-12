@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
@@ -6,6 +6,7 @@ from app.db.session import get_db
 from app.models.company_membership import CompanyMembership
 from app.schemas.designation import (
     DesignationCreate,
+    DesignationListResponse,
     DesignationResponse,
     DesignationUpdate,
 )
@@ -47,10 +48,13 @@ def validate_company_membership(
 
 @router.get(
     "",
-    response_model=list[DesignationResponse],
+    response_model=DesignationListResponse,
 )
 def get_designations(
     company_id: int,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
+    search: str | None = Query(default=None, max_length=150),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -60,9 +64,22 @@ def get_designations(
         company_id,
     )
 
-    return list_designations(
+    designations, total = list_designations(
         db,
         company_id,
+        page=page,
+        page_size=page_size,
+        search=search,
+    )
+
+    total_pages = (total + page_size - 1) // page_size
+
+    return DesignationListResponse(
+        designations=designations,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
     )
 
 
