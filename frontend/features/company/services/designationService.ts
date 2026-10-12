@@ -17,6 +17,20 @@ export type DesignationPayload = {
   is_active?: boolean;
 };
 
+export type DesignationQueryParams = {
+  page?: number;
+  page_size?: number;
+  search?: string;
+};
+
+export type PaginatedDesignationsResponse = {
+  designations: Designation[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+};
+
 async function handleResponse<T>(
   response: Response,
 ): Promise<T> {
@@ -39,21 +53,29 @@ async function handleResponse<T>(
   return response.json() as Promise<T>;
 }
 
-
 export async function getDesignations(
   companyId: number,
-): Promise<Designation[]> {
+  params: DesignationQueryParams = {},
+): Promise<PaginatedDesignationsResponse> {
+  const query = new URLSearchParams({
+    page: String(params.page ?? 1),
+    page_size: String(params.page_size ?? 10),
+  });
+
+  if (params.search?.trim()) {
+    query.set("search", params.search.trim());
+  }
+
   const response = await fetch(
-    `${API_URL}/companies/${companyId}/designations`,
+    `${API_URL}/companies/${companyId}/designations?${query.toString()}`,
     {
       method: "GET",
       credentials: "include",
     },
   );
 
-  return handleResponse<Designation[]>(response);
+  return handleResponse<PaginatedDesignationsResponse>(response);
 }
-
 
 export async function getDesignation(
   companyId: number,
@@ -69,7 +91,6 @@ export async function getDesignation(
 
   return handleResponse<Designation>(response);
 }
-
 
 export async function createDesignation(
   companyId: number,
@@ -90,7 +111,6 @@ export async function createDesignation(
   return handleResponse<Designation>(response);
 }
 
-
 export async function updateDesignation(
   companyId: number,
   designationId: number,
@@ -110,7 +130,6 @@ export async function updateDesignation(
 
   return handleResponse<Designation>(response);
 }
-
 
 export async function updateDesignationStatus(
   companyId: number,
