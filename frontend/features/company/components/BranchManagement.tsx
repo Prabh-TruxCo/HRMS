@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, Pencil, Power, Search } from "lucide-react";
+import { Activity, MapPin, Pencil, Power, Search } from "lucide-react";
 import { useCompany } from "../context/CompanyContext";
 import { useSnackbar } from "@/components/feedback/SnackbarProvider";
 import AuditLogModal from "./AuditLogModal";
@@ -16,7 +16,7 @@ import {
   updateBranch,
   type Branch,
 } from "../services/branchService";
-
+import { useRouter } from "next/navigation";
 type BranchForm = {
   name: string;
   code: string;
@@ -41,7 +41,7 @@ const EMPTY_FORM: BranchForm = {
 
 export default function BranchManagement() {
   const { currentCompany } = useCompany();
-
+  const router = useRouter();
   const companyId = currentCompany?.id ?? null;
 
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -522,6 +522,19 @@ export default function BranchManagement() {
                             className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-[var(--brand-color)]"
                           >
                             <Activity size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              router.push(
+                                `/organization/branches/${branch.id}/locations`,
+                              )
+                            }
+                            title="Manage office locations"
+                            aria-label={`Manage locations for ${branch.name}`}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-[var(--brand-color)]"
+                          >
+                            <MapPin size={15} />
                           </button>
                         </div>
                       </td>
