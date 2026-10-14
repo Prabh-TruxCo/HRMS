@@ -13,6 +13,10 @@ export type Site = {
   state: string | null;
   country: string;
   postal_code: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  geofence_radius: number | null;
+  is_geofence_enabled: boolean;
   contact_person: string | null;
   phone: string | null;
   email: string | null;
@@ -46,6 +50,10 @@ export type SitePayload = {
   state?: string | null;
   country?: string;
   postal_code?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  geofence_radius?: number | null;
+  is_geofence_enabled?: boolean;
   contact_person?: string | null;
   phone?: string | null;
   email?: string | null;

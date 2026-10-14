@@ -34,9 +34,7 @@ def _validate_client(
     )
 
     if client is None:
-        raise ValueError(
-            "The selected client does not belong to this company."
-        )
+        raise ValueError("The selected client does not belong to this company.")
 
     if not client.is_active:
         raise ValueError("The selected client is inactive.")
@@ -121,6 +119,10 @@ def create_site(
     state: str | None = None,
     country: str = "India",
     postal_code: str | None = None,
+    latitude: float | None = None,
+    longitude: float | None = None,
+    geofence_radius: int | None = None,
+    is_geofence_enabled: bool = False,
     contact_person: str | None = None,
     phone: str | None = None,
     email: str | None = None,
@@ -140,9 +142,11 @@ def create_site(
         state=state.strip() if state else None,
         country=country.strip(),
         postal_code=postal_code.strip() if postal_code else None,
-        contact_person=(
-            contact_person.strip() if contact_person else None
-        ),
+        latitude=latitude,
+        longitude=longitude,
+        geofence_radius=geofence_radius,
+        is_geofence_enabled=is_geofence_enabled,
+        contact_person=(contact_person.strip() if contact_person else None),
         phone=phone.strip() if phone else None,
         email=email.strip() if email else None,
         is_active=is_active,
@@ -212,6 +216,10 @@ def update_site(
     state: str | None = None,
     country: str = "India",
     postal_code: str | None = None,
+    latitude: float | None = None,
+    longitude: float | None = None,
+    geofence_radius: int | None = None,
+    is_geofence_enabled: bool = False,
     contact_person: str | None = None,
     phone: str | None = None,
     email: str | None = None,
@@ -230,6 +238,10 @@ def update_site(
         "state": site.state,
         "country": site.country,
         "postal_code": site.postal_code,
+        "latitude": site.latitude,
+        "longitude": site.longitude,
+        "geofence_radius": site.geofence_radius,
+        "is_geofence_enabled": site.is_geofence_enabled,
         "contact_person": site.contact_person,
         "phone": site.phone,
         "email": site.email,
@@ -248,9 +260,11 @@ def update_site(
     site.state = state.strip() if state else None
     site.country = country.strip()
     site.postal_code = postal_code.strip() if postal_code else None
-    site.contact_person = (
-        contact_person.strip() if contact_person else None
-    )
+    site.latitude = latitude
+    site.longitude = longitude
+    site.geofence_radius = geofence_radius
+    site.is_geofence_enabled = is_geofence_enabled
+    site.contact_person = contact_person.strip() if contact_person else None
     site.phone = phone.strip() if phone else None
     site.email = email.strip() if email else None
     site.is_active = is_active
@@ -266,6 +280,10 @@ def update_site(
         "state": site.state,
         "country": site.country,
         "postal_code": site.postal_code,
+        "latitude": site.latitude,
+        "longitude": site.longitude,
+        "geofence_radius": site.geofence_radius,
+        "is_geofence_enabled": site.is_geofence_enabled,
         "contact_person": site.contact_person,
         "phone": site.phone,
         "email": site.email,

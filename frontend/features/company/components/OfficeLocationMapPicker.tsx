@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
+  Circle,
   MapContainer,
   Marker,
   TileLayer,
@@ -18,6 +19,7 @@ type Coordinates = {
 
 type OfficeLocationMapPickerProps = Coordinates & {
   onChange: (coordinates: Coordinates) => void;
+  radius?: number | null;
 };
 
 type SearchResult = {
@@ -107,6 +109,7 @@ export default function OfficeLocationMapPicker({
   latitude,
   longitude,
   onChange,
+  radius,
 }: OfficeLocationMapPickerProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -327,6 +330,20 @@ export default function OfficeLocationMapPicker({
               onChange={onChange}
             />
           )}
+          {latitude != null &&
+  longitude != null &&
+  radius != null &&
+  radius > 0 && (
+    <Circle
+      center={[latitude, longitude]}
+      radius={radius}
+      pathOptions={{
+        color: "#16a34a",
+        fillColor: "#16a34a",
+        fillOpacity: 0.12,
+      }}
+    />
+  )}
         </MapContainer>
       </div>
 

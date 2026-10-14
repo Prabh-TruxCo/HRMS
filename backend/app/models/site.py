@@ -7,6 +7,8 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    Float,
+    Integer,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -85,6 +87,27 @@ class Site(Base):
     postal_code: Mapped[str | None] = mapped_column(
         String(20),
         nullable=True,
+    )
+    
+    latitude: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
+    longitude: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
+    geofence_radius: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+
+    is_geofence_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
     )
 
     contact_person: Mapped[str | None] = mapped_column(

@@ -33,6 +33,7 @@ import { Client, getClients } from "@/features/company/services/clientService";
 import StatusConfirmModal from "@/components/feedback/StatusConfirmModal";
 import AuditLogModal from "@/features/company/components/AuditLogModal";
 import { useSnackbar } from "@/components/feedback/SnackbarProvider";
+import OfficeLocationMapPicker from "@/features/company/components/OfficeLocationMapPicker";
 import {
   AuditLog,
   getEntityAuditLogs,
@@ -67,6 +68,10 @@ const emptyForm: SitePayload = {
   phone: "",
   email: "",
   description: "",
+  latitude: null,
+  longitude: null,
+  geofence_radius: 100,
+  is_geofence_enabled: false,
   is_active: true,
 };
 
@@ -336,6 +341,10 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
       phone: site.phone ?? "",
       email: site.email ?? "",
       description: site.description ?? "",
+      latitude: site.latitude ?? null,
+      longitude: site.longitude ?? null,
+      geofence_radius: site.geofence_radius ?? 100,
+      is_geofence_enabled: site.is_geofence_enabled ?? false,
       is_active: site.is_active,
     });
 
@@ -382,6 +391,12 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
       email: form.email?.trim() || null,
       description: form.description?.trim() || null,
       is_active: form.is_active !== false,
+
+      // Geopoint and geofence fields
+      latitude: form.latitude ?? null,
+      longitude: form.longitude ?? null,
+      geofence_radius: form.geofence_radius ?? null,
+      is_geofence_enabled: form.is_geofence_enabled ?? false,
     };
   }
 
@@ -411,12 +426,32 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
       showSnackbar("Site name and address are required.", "error");
       return;
     }
+    if (form.is_geofence_enabled) {
+      if (form.latitude == null || form.longitude == null) {
+        showSnackbar(
+          "Select the site location on the map before enabling geofencing.",
+          "error",
+        );
+        return;
+      }
+
+      if (
+        form.geofence_radius == null ||
+        !Number.isInteger(form.geofence_radius) ||
+        form.geofence_radius <= 0
+      ) {
+        showSnackbar(
+          "Enter a valid geofence radius greater than zero.",
+          "error",
+        );
+        return;
+      }
+    }
 
     try {
       setSaving(true);
 
       const payload = buildPayload();
-
       if (editingSite) {
         await updateSite(companyId, editingSite.id, payload);
         showSnackbar("Site updated successfully.", "success");
@@ -463,6 +498,10 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
         phone: statusSite.phone,
         email: statusSite.email,
         description: statusSite.description,
+        latitude: statusSite.latitude ?? null,
+        longitude: statusSite.longitude ?? null,
+        geofence_radius: statusSite.geofence_radius ?? null,
+        is_geofence_enabled: statusSite.is_geofence_enabled ?? false,
         is_active: !statusSite.is_active,
       };
 
@@ -608,7 +647,7 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
         ) : (
           <div className="h-[clamp(220px,calc(100dvh-360px),760px)] overflow-auto">
             <table className="w-full min-w-[950px] text-left text-xs">
-               <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
+              <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
                 <tr className="border-b border-[var(--border)]">
                   {[
                     "Site",
@@ -995,7 +1034,106 @@ export default function SiteManagement({ companyId }: SiteManagementProps) {
                     className="w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--brand-color)]"
                   />
                 </div>
+                {/* Geopoint and geofence settings */}
+                <div className="space-y-3 rounded-lg border border-[var(--border)] p-3 sm:col-span-2">
+                  <div>
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                      Geopoint & Geofence
+                    </h3>
+                    <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                      Select the site location on the map and optionally
+                      restrict attendance to a radius around it.
+                    </p>
+                  </div>
 
+                  <OfficeLocationMapPicker
+                    latitude={form.latitude ?? null}
+                    longitude={form.longitude ?? null}
+                    radius={
+                      form.is_geofence_enabled ? form.geofence_radius : null
+                    }
+                    onChange={({ latitude, longitude }) => {
+                      setForm((current) => ({
+                        ...current,
+                        latitude,
+                        longitude,
+                      }));
+                    }}
+                  />
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className={labelClass}>Latitude</label>
+                      <input
+                        value={form.latitude ?? ""}
+                        readOnly
+                        placeholder="Select a point on the map"
+                        className={inputClass}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelClass}>Longitude</label>
+                      <input
+                        value={form.longitude ?? ""}
+                        readOnly
+                        placeholder="Select a point on the map"
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+
+                  <label className="flex items-start gap-2 text-sm text-[var(--text-primary)]">
+                    <input
+                      type="checkbox"
+                      checked={form.is_geofence_enabled ?? false}
+                      onChange={(event) => {
+                        updateField(
+                          "is_geofence_enabled",
+                          event.target.checked,
+                        );
+                      }}
+                      className="mt-0.5 h-4 w-4 rounded border-[var(--border)]"
+                    />
+                    <span>
+                      <span className="block font-medium">Enable geofence</span>
+                      <span className="mt-0.5 block text-xs text-[var(--text-secondary)]">
+                        Use this location and radius for location-based
+                        attendance validation.
+                      </span>
+                    </span>
+                  </label>
+
+                  {form.is_geofence_enabled && (
+                    <div className="max-w-xs">
+                      <label className={labelClass}>
+                        Geofence Radius (metres) *
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={100000}
+                        step={1}
+                        required
+                        value={form.geofence_radius ?? ""}
+                        onChange={(event) => {
+                          const value = event.target.value;
+
+                          setForm((current) => ({
+                            ...current,
+                            geofence_radius:
+                              value === "" ? null : Number(value),
+                          }));
+                        }}
+                        placeholder="e.g. 100"
+                        className={inputClass}
+                      />
+                      <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                        The green circle previews the permitted radius.
+                      </p>
+                    </div>
+                  )}
+                </div>
                 <div>
                   <label className={labelClass}>City</label>
                   <input
