@@ -18,8 +18,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <DashboardTopbar />
         </div>
 
-        {/* Page area */}
-        <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
+        {/* Scrollable page area */}
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain">
           {children}
         </main>
       </div>

@@ -20,6 +20,7 @@ import {
 import { getCompanyRoles } from "@/features/company/services/membershipService";
 
 export const DEFAULT_BRAND_COLOR = "#5F8F59";
+const SELECTED_COMPANY_STORAGE_KEY = "hrms_selected_company_id";
 
 export function getCompanyBrandColor(color: string | null | undefined): string {
   return color?.trim() || DEFAULT_BRAND_COLOR;
@@ -51,11 +52,13 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isRolesLoading, setIsRolesLoading] = useState(false);
-  const clearCompanyState = () => {
+  const clearCompanyState = useCallback(() => {
     setCompanies([]);
     setCurrentCompanyState(null);
     setCurrentCompanyRoles([]);
-  };
+
+    localStorage.removeItem(SELECTED_COMPANY_STORAGE_KEY);
+  }, []);
   const { currentUser } = useAuth();
   const refreshCompanies = useCallback(async () => {
     try {
@@ -66,13 +69,31 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       setCompanies(result);
 
       setCurrentCompanyState((current) => {
-        if (!current) {
-          return result[0] ?? null;
+        const savedCompanyId =
+          typeof window !== "undefined"
+            ? localStorage.getItem(SELECTED_COMPANY_STORAGE_KEY)
+            : null;
+
+        const preferredCompanyId = savedCompanyId
+          ? Number(savedCompanyId)
+          : current?.id;
+
+        const preferredCompany = result.find(
+          (company) => company.id === preferredCompanyId,
+        );
+
+        const nextCompany = preferredCompany ?? result[0] ?? null;
+
+        if (nextCompany) {
+          localStorage.setItem(
+            SELECTED_COMPANY_STORAGE_KEY,
+            String(nextCompany.id),
+          );
+        } else {
+          localStorage.removeItem(SELECTED_COMPANY_STORAGE_KEY);
         }
 
-        const stillExists = result.find((company) => company.id === current.id);
-
-        return stillExists ?? result[0] ?? null;
+        return nextCompany;
       });
     } finally {
       setIsLoading(false);
@@ -121,9 +142,11 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       isMounted = false;
     };
   }, [currentCompany]);
-  const setCurrentCompany = (company: CompanyResponse) => {
+  const setCurrentCompany = useCallback((company: CompanyResponse) => {
+    localStorage.setItem(SELECTED_COMPANY_STORAGE_KEY, String(company.id));
+
     setCurrentCompanyState(company);
-  };
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -143,7 +166,9 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       currentCompanyRoles,
       isLoading,
       isRolesLoading,
+      setCurrentCompany,
       refreshCompanies,
+      clearCompanyState,
     ],
   );
 
