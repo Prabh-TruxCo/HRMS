@@ -32,6 +32,7 @@ import { getSites, type Site } from "@/features/company/services/siteService";
 import StatusConfirmModal from "@/components/feedback/StatusConfirmModal";
 import AuditLogModal from "@/features/company/components/AuditLogModal";
 import { useSnackbar } from "@/components/feedback/SnackbarProvider";
+import OfficeLocationMapPicker from "@/features/company/components/OfficeLocationMapPicker";
 import {
   type AuditLog,
   getEntityAuditLogs,
@@ -46,6 +47,10 @@ const emptyForm: PostPayload = {
   name: "",
   code: "",
   description: "",
+  latitude: null,
+  longitude: null,
+  geofence_radius: 100,
+  is_geofence_enabled: false,
   is_active: true,
 };
 
@@ -250,6 +255,10 @@ export default function PostManagement({ companyId }: PostManagementProps) {
       name: post.name,
       code: post.code ?? "",
       description: post.description ?? "",
+      latitude: post.latitude ?? null,
+      longitude: post.longitude ?? null,
+      geofence_radius: post.geofence_radius ?? 100,
+      is_geofence_enabled: post.is_geofence_enabled ?? false,
       is_active: post.is_active,
     });
 
@@ -274,6 +283,10 @@ export default function PostManagement({ companyId }: PostManagementProps) {
       name: form.name.trim(),
       code: form.code?.trim() || null,
       description: form.description?.trim() || null,
+      latitude: form.latitude ?? null,
+      longitude: form.longitude ?? null,
+      geofence_radius: form.geofence_radius ?? null,
+      is_geofence_enabled: form.is_geofence_enabled ?? false,
       is_active: form.is_active !== false,
     };
   }
@@ -301,6 +314,35 @@ export default function PostManagement({ companyId }: PostManagementProps) {
     if (!form.name.trim()) {
       showSnackbar("Post name is required.", "error");
       return;
+    }
+
+    if (form.is_geofence_enabled) {
+      if (form.latitude == null || form.longitude == null) {
+        showSnackbar(
+          "Latitude and longitude are required when the post geofence is enabled.",
+          "error",
+        );
+        return;
+      }
+
+      if (
+        form.latitude < -90 ||
+        form.latitude > 90 ||
+        form.longitude < -180 ||
+        form.longitude > 180
+      ) {
+        showSnackbar("Enter valid latitude and longitude values.", "error");
+        return;
+      }
+
+      if (
+        form.geofence_radius == null ||
+        !Number.isInteger(form.geofence_radius) ||
+        form.geofence_radius <= 0
+      ) {
+        showSnackbar("Enter a positive whole-number geofence radius.", "error");
+        return;
+      }
     }
 
     try {
@@ -774,6 +816,138 @@ export default function PostManagement({ companyId }: PostManagementProps) {
                     placeholder="Describe this operational position..."
                     className="w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--brand-color)]"
                   />
+                </div>
+              </div>
+
+              <div className="space-y-3 rounded-lg border border-[var(--border)] p-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                    Post Location & Geofence
+                  </h3>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                    Set a location specific to this post. If no post location is
+                    configured, location-based operations can fall back to the
+                    site&apos;s coordinates.
+                  </p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className={labelClass}>Latitude</label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="-90"
+                      max="90"
+                      value={form.latitude ?? ""}
+                      onChange={(event) =>
+                        updateField(
+                          "latitude",
+                          event.target.value === ""
+                            ? null
+                            : Number(event.target.value),
+                        )
+                      }
+                      placeholder="e.g. 30.9010"
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Longitude</label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="-180"
+                      max="180"
+                      value={form.longitude ?? ""}
+                      onChange={(event) =>
+                        updateField(
+                          "longitude",
+                          event.target.value === ""
+                            ? null
+                            : Number(event.target.value),
+                        )
+                      }
+                      placeholder="e.g. 75.8573"
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2">
+                  <input
+                    id="post-geofence-enabled"
+                    type="checkbox"
+                    checked={form.is_geofence_enabled ?? false}
+                    onChange={(event) =>
+                      updateField("is_geofence_enabled", event.target.checked)
+                    }
+                    className="mt-0.5 h-4 w-4 rounded border-[var(--border)]"
+                  />
+                  <div>
+                    <label
+                      htmlFor="post-geofence-enabled"
+                      className="text-sm font-medium text-[var(--text-primary)]"
+                    >
+                      Enable post geofence
+                    </label>
+                    <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+                      Restrict location-based attendance to the configured
+                      radius.
+                    </p>
+                  </div>
+                </div>
+
+                {form.is_geofence_enabled && (
+                  <div>
+                    <label className={labelClass}>
+                      Geofence Radius (metres) *
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      required
+                      value={form.geofence_radius ?? ""}
+                      onChange={(event) =>
+                        updateField(
+                          "geofence_radius",
+                          event.target.value === ""
+                            ? null
+                            : Number(event.target.value),
+                        )
+                      }
+                      placeholder="100"
+                      className={inputClass}
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <label className={labelClass}>Select Post Location</label>
+
+                  <OfficeLocationMapPicker
+                    latitude={form.latitude ?? null}
+                    longitude={form.longitude ?? null}
+                    radius={
+                      form.is_geofence_enabled
+                        ? (form.geofence_radius ?? null)
+                        : null
+                    }
+                    onChange={({ latitude, longitude }) => {
+                      setForm((current) => ({
+                        ...current,
+                        latitude,
+                        longitude,
+                      }));
+                    }}
+                  />
+
+                  <p className="text-[11px] text-[var(--text-muted)]">
+                    Search for a location, select it on the map, or drag the
+                    marker. The coordinates above update automatically.
+                  </p>
                 </div>
               </div>
 

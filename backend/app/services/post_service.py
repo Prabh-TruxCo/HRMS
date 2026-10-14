@@ -95,14 +95,20 @@ def get_post(
     )
 
 
+
 def _audit_values(post: Post) -> dict:
     return {
         "site_id": post.site_id,
         "name": post.name,
         "code": post.code,
         "description": post.description,
+        "latitude": post.latitude,
+        "longitude": post.longitude,
+        "geofence_radius": post.geofence_radius,
+        "is_geofence_enabled": post.is_geofence_enabled,
         "is_active": post.is_active,
     }
+
 
 
 def create_post(
@@ -115,6 +121,10 @@ def create_post(
     code: str | None = None,
     description: str | None = None,
     is_active: bool = True,
+    latitude: float | None = None,
+longitude: float | None = None,
+geofence_radius: int | None = None,
+is_geofence_enabled: bool = False,
 ) -> Post:
     _validate_site(db, company_id, site_id)
 
@@ -129,6 +139,10 @@ def create_post(
             else None
         ),
         is_active=is_active,
+        latitude=latitude,
+longitude=longitude,
+geofence_radius=geofence_radius,
+is_geofence_enabled=is_geofence_enabled,
     )
 
     db.add(post)
@@ -174,6 +188,10 @@ def update_post(
     name: str,
     code: str | None = None,
     description: str | None = None,
+    latitude: float | None = None,
+longitude: float | None = None,
+geofence_radius: int | None = None,
+is_geofence_enabled: bool = False,
     is_active: bool,
 ) -> Post:
     _validate_site(db, post.company_id, site_id)
@@ -188,6 +206,10 @@ def update_post(
         if description and description.strip()
         else None
     )
+    post.latitude = latitude
+    post.longitude = longitude
+    post.geofence_radius = geofence_radius
+    post.is_geofence_enabled = is_geofence_enabled
     post.is_active = is_active
 
     new_values = _audit_values(post)

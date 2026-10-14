@@ -1,6 +1,7 @@
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
 
+
 export type Post = {
   id: number;
   company_id: number;
@@ -8,10 +9,15 @@ export type Post = {
   name: string;
   code: string | null;
   description: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  geofence_radius: number | null;
+  is_geofence_enabled: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;
 };
+
 
 export type PostListResponse = {
   posts: Post[];
@@ -28,13 +34,19 @@ export type PostListParams = {
   site_id?: number;
 };
 
+
 export type PostPayload = {
   site_id: number;
   name: string;
   code?: string | null;
   description?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  geofence_radius?: number | null;
+  is_geofence_enabled?: boolean;
   is_active?: boolean;
 };
+
 
 async function handleResponse<T>(
   response: Response,

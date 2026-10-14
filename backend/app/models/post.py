@@ -2,6 +2,7 @@ from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     String,
@@ -44,6 +45,17 @@ class Post(Base):
     name = Column(String(150), nullable=False)
     code = Column(String(50), nullable=True)
     description = Column(Text, nullable=True)
+
+    # Post-specific geopoint and geofence configuration
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    geofence_radius = Column(Integer, nullable=True)
+    is_geofence_enabled = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+    )
 
     is_active = Column(Boolean, nullable=False, default=True)
 
