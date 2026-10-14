@@ -256,18 +256,41 @@ export default function OrganizationOverview({
     "/organization/sites": organizationConfiguration?.sites_enabled ?? true,
     "/organization/posts": organizationConfiguration?.posts_enabled ?? true,
   };
+
   const loadCounts = useCallback(async () => {
     if (companyId === null) {
       setCounts({});
       setLoading(false);
       return;
     }
+
     setLoading(true);
     setError("");
 
     try {
+      const enabledModules = modules.filter((module) => {
+        switch (module.endpoint) {
+          case "branches":
+            return organizationConfiguration?.branches_enabled === true;
+          case "departments":
+            return organizationConfiguration?.departments_enabled === true;
+          case "teams":
+            return organizationConfiguration?.teams_enabled === true;
+          case "designations":
+            return organizationConfiguration?.designations_enabled === true;
+          case "clients":
+            return organizationConfiguration?.clients_enabled === true;
+          case "sites":
+            return organizationConfiguration?.sites_enabled === true;
+          case "posts":
+            return organizationConfiguration?.posts_enabled === true;
+          default:
+            return false;
+        }
+      });
+
       const results = await Promise.all(
-        modules.map(async (module) => {
+        enabledModules.map(async (module) => {
           const query = new URLSearchParams({
             page: "1",
             page_size: "1",
@@ -307,7 +330,7 @@ export default function OrganizationOverview({
     } finally {
       setLoading(false);
     }
-  }, [companyId]);
+  }, [companyId, organizationConfiguration]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {

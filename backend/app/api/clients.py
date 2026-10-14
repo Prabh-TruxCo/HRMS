@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
 from app.db.session import get_db
-from app.models.company_membership import CompanyMembership
+from app.api.organization_access import validate_organization_module_access
 from app.schemas.client import (
     ClientCreateRequest,
     ClientListResponse,
@@ -24,28 +24,6 @@ router = APIRouter(
 )
 
 
-def validate_company_membership(
-    db: Session,
-    company_id: int,
-    current_user,
-) -> None:
-    membership = (
-        db.query(CompanyMembership)
-        .filter(
-            CompanyMembership.company_id == company_id,
-            CompanyMembership.user_id == current_user.id,
-            CompanyMembership.is_active.is_(True),
-        )
-        .first()
-    )
-
-    if not membership:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this company.",
-        )
-
-
 @router.get(
     "",
     response_model=ClientListResponse,
@@ -58,10 +36,11 @@ def get_clients(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(
+    validate_organization_module_access(
         db,
         company_id,
         current_user,
+        "clients_enabled",
     )
 
     clients, total = list_clients(
@@ -91,10 +70,11 @@ def get_client_detail(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(
+    validate_organization_module_access(
         db,
         company_id,
         current_user,
+        "clients_enabled",
     )
 
     client = get_client(
@@ -123,10 +103,11 @@ def create_client_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(
+    validate_organization_module_access(
         db,
         company_id,
         current_user,
+        "clients_enabled",
     )
 
     try:
@@ -164,10 +145,11 @@ def update_client_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(
+    validate_organization_module_access(
         db,
         company_id,
         current_user,
+        "clients_enabled",
     )
 
     client = get_client(
@@ -216,10 +198,11 @@ def update_client_status_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(
+    validate_organization_module_access(
         db,
         company_id,
         current_user,
+        "clients_enabled",
     )
 
     client = get_client(

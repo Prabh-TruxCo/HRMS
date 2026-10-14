@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
 from app.db.session import get_db
-from app.models.company_membership import CompanyMembership
+from app.api.organization_access import validate_organization_module_access
 from app.schemas.team import (
     TeamCreate,
     TeamListResponse,
@@ -23,28 +23,6 @@ router = APIRouter(
 )
 
 
-def validate_company_membership(
-    db: Session,
-    user_id: int,
-    company_id: int,
-) -> None:
-    membership = (
-        db.query(CompanyMembership)
-        .filter(
-            CompanyMembership.user_id == user_id,
-            CompanyMembership.company_id == company_id,
-            CompanyMembership.is_active.is_(True),
-        )
-        .first()
-    )
-
-    if membership is None:
-        raise HTTPException(
-            status_code=403,
-            detail="You do not have access to this company.",
-        )
-
-
 @router.get(
     "",
     response_model=TeamListResponse,
@@ -61,10 +39,12 @@ def get_teams(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(
+
+    validate_organization_module_access(
         db,
-        current_user.id,
         company_id,
+        current_user,
+        "teams_enabled",
     )
 
     teams, total = list_teams(
@@ -95,10 +75,12 @@ def get_team_by_id(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(
+
+    validate_organization_module_access(
         db,
-        current_user.id,
         company_id,
+        current_user,
+        "teams_enabled",
     )
 
     team = get_team(
@@ -127,10 +109,12 @@ def create_team_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(
+
+    validate_organization_module_access(
         db,
-        current_user.id,
         company_id,
+        current_user,
+        "teams_enabled",
     )
 
     try:
@@ -162,10 +146,12 @@ def update_team_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(
+
+    validate_organization_module_access(
         db,
-        current_user.id,
         company_id,
+        current_user,
+        "teams_enabled",
     )
 
     team = get_team(

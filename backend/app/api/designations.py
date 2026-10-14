@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
 from app.db.session import get_db
-from app.models.company_membership import CompanyMembership
+from app.api.organization_access import validate_organization_module_access
 from app.schemas.designation import (
     DesignationCreate,
     DesignationListResponse,
@@ -24,28 +24,6 @@ router = APIRouter(
 )
 
 
-def validate_company_membership(
-    db: Session,
-    user_id: int,
-    company_id: int,
-) -> None:
-    membership = (
-        db.query(CompanyMembership)
-        .filter(
-            CompanyMembership.user_id == user_id,
-            CompanyMembership.company_id == company_id,
-            CompanyMembership.is_active.is_(True),
-        )
-        .first()
-    )
-
-    if membership is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this company.",
-        )
-
-
 @router.get(
     "",
     response_model=DesignationListResponse,
@@ -58,10 +36,12 @@ def get_designations(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(
+
+    validate_organization_module_access(
         db,
-        current_user.id,
         company_id,
+        current_user,
+        "designations_enabled",
     )
 
     designations, total = list_designations(
@@ -93,10 +73,12 @@ def get_designation_by_id(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(
+
+    validate_organization_module_access(
         db,
-        current_user.id,
         company_id,
+        current_user,
+        "designations_enabled",
     )
 
     designation = get_designation(
@@ -125,10 +107,12 @@ def create_designation_api(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(
+
+    validate_organization_module_access(
         db,
-        current_user.id,
         company_id,
+        current_user,
+        "designations_enabled",
     )
 
     try:
@@ -159,10 +143,12 @@ def update_designation_api(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(
+
+    validate_organization_module_access(
         db,
-        current_user.id,
         company_id,
+        current_user,
+        "designations_enabled",
     )
 
     designation = get_designation(
@@ -204,10 +190,12 @@ def update_designation_status_api(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(
+
+    validate_organization_module_access(
         db,
-        current_user.id,
         company_id,
+        current_user,
+        "designations_enabled",
     )
 
     designation = get_designation(

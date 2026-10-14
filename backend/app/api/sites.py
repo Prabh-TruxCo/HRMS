@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
 from app.db.session import get_db
-from app.models.company_membership import CompanyMembership
+from app.api.organization_access import validate_organization_module_access
 from app.schemas.site import (
     SiteCreateRequest,
     SiteListResponse,
@@ -26,28 +26,6 @@ router = APIRouter(
 )
 
 
-def validate_company_membership(
-    db: Session,
-    company_id: int,
-    current_user,
-) -> None:
-    membership = (
-        db.query(CompanyMembership)
-        .filter(
-            CompanyMembership.company_id == company_id,
-            CompanyMembership.user_id == current_user.id,
-            CompanyMembership.is_active.is_(True),
-        )
-        .first()
-    )
-
-    if not membership:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this company.",
-        )
-
-
 @router.get("", response_model=SiteListResponse)
 def get_sites(
     company_id: int,
@@ -57,7 +35,12 @@ def get_sites(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(db, company_id, current_user)
+    validate_organization_module_access(
+        db,
+        company_id,
+        current_user,
+        "sites_enabled",
+    )
 
     sites, total = list_sites(
         db,
@@ -83,7 +66,12 @@ def get_site_detail(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(db, company_id, current_user)
+    validate_organization_module_access(
+        db,
+        company_id,
+        current_user,
+        "sites_enabled",
+    )
 
     site = get_site(db, company_id, site_id)
 
@@ -107,7 +95,12 @@ def create_site_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(db, company_id, current_user)
+    validate_organization_module_access(
+        db,
+        company_id,
+        current_user,
+        "sites_enabled",
+    )
 
     try:
         return create_site(
@@ -131,7 +124,12 @@ def update_site_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(db, company_id, current_user)
+    validate_organization_module_access(
+        db,
+        company_id,
+        current_user,
+        "sites_enabled",
+    )
 
     site = get_site(db, company_id, site_id)
 

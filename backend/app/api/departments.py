@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
 from app.db.session import get_db
-from app.models.company_membership import CompanyMembership
+from app.api.organization_access import validate_organization_module_access
 from app.schemas.department import (
     DepartmentCreateRequest,
     DepartmentListResponse,
@@ -23,26 +23,6 @@ router = APIRouter(
 )
 
 
-def validate_company_membership(
-    db: Session,
-    company_id: int,
-    user_id: int,
-) -> None:
-    membership = db.scalar(
-        CompanyMembership.__table__.select().where(
-            CompanyMembership.company_id == company_id,
-            CompanyMembership.user_id == user_id,
-            CompanyMembership.is_active.is_(True),
-        )
-    )
-
-    if membership is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this company.",
-        )
-
-
 @router.get(
     "",
     response_model=DepartmentListResponse,
@@ -55,10 +35,12 @@ def get_departments(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(
+    
+    validate_organization_module_access(
         db,
         company_id,
-        current_user.id,
+        current_user,
+        "departments_enabled",
     )
 
     departments, total = list_departments(
@@ -90,11 +72,14 @@ def get_department_by_id(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(
+    
+    validate_organization_module_access(
         db,
         company_id,
-        current_user.id,
+        current_user,
+        "departments_enabled",
     )
+
 
     department = get_department(
         db,
@@ -122,11 +107,14 @@ def create_new_department(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(
+    
+    validate_organization_module_access(
         db,
         company_id,
-        current_user.id,
+        current_user,
+        "departments_enabled",
     )
+
 
     try:
         return create_department(
@@ -156,11 +144,14 @@ def update_existing_department(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(
+    
+    validate_organization_module_access(
         db,
         company_id,
-        current_user.id,
+        current_user,
+        "departments_enabled",
     )
+
 
     department = get_department(
         db,

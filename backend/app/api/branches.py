@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
 from app.db.session import get_db
-from app.models.company_membership import CompanyMembership
 from app.schemas.branch import (
     BranchCreateRequest,
     BranchListResponse,
@@ -16,33 +15,12 @@ from app.services.branch_service import (
     list_branches,
     update_branch,
 )
+from app.api.organization_access import validate_organization_module_access
 
 router = APIRouter(
     prefix="/companies/{company_id}/branches",
     tags=["Branches"],
 )
-
-
-def validate_company_membership(
-    db: Session,
-    company_id: int,
-    current_user,
-) -> None:
-    membership = (
-        db.query(CompanyMembership)
-        .filter(
-            CompanyMembership.company_id == company_id,
-            CompanyMembership.user_id == current_user.id,
-            CompanyMembership.is_active.is_(True),
-        )
-        .first()
-    )
-
-    if not membership:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this company.",
-        )
 
 
 @router.get(
@@ -57,10 +35,11 @@ def get_branches(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(
+    validate_organization_module_access(
         db,
         company_id,
         current_user,
+        "branches_enabled",
     )
 
     return list_branches(
@@ -82,10 +61,11 @@ def get_branch_detail(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(
+    validate_organization_module_access(
         db,
         company_id,
         current_user,
+        "branches_enabled",
     )
 
     branch = get_branch(
@@ -114,10 +94,11 @@ def create_branch_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(
+    validate_organization_module_access(
         db,
         company_id,
         current_user,
+        "branches_enabled",
     )
 
     try:
@@ -152,10 +133,11 @@ def update_branch_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    validate_company_membership(
+    validate_organization_module_access(
         db,
         company_id,
         current_user,
+        "branches_enabled",
     )
 
     branch = get_branch(
