@@ -67,10 +67,7 @@ const NAV: NavSection[] = [
         label: "Workforce",
         href: "/workforce",
         icon: BriefcaseBusiness,
-        children: [
-          { label: "Overview", href: "/workforce", exact: true },
-          { label: "Employment types", href: "/workforce/employment-types" },
-        ],
+        children: [{ label: "Overview", href: "/workforce", exact: true }],
       },
     ],
   },
@@ -88,7 +85,11 @@ const NAV: NavSection[] = [
   {
     title: "Administration",
     items: [
-      { label: "Company settings", href: "/settings/company", icon: Settings },
+      {
+        label: "Company settings",
+        href: "/settings/company",
+        icon: Settings,
+      },
     ],
   },
 ];

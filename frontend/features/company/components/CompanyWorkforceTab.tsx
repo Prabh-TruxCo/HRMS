@@ -337,12 +337,34 @@ export default function CompanyWorkforceTab() {
     }
   };
 
-  if (loading || !configuration) {
+  if (loading) {
     return (
       <div className="flex min-h-[300px] items-center justify-center">
         <div className="text-sm text-[var(--text-secondary)]">
           Loading workforce settings...
         </div>
+      </div>
+    );
+  }
+
+  if (!configuration) {
+    return (
+      <div className="space-y-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6">
+        <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+          Unable to load Workforce Settings
+        </h2>
+
+        <p className="text-sm text-red-600">
+          {error || "Workforce configuration could not be loaded."}
+        </p>
+
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="rounded-lg bg-[var(--brand-color)] px-4 py-2 text-sm font-medium text-white"
+        >
+          Try again
+        </button>
       </div>
     );
   }
