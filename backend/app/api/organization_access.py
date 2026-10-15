@@ -15,6 +15,7 @@ OrganizationModule = Literal[
     "clients_enabled",
     "sites_enabled",
     "posts_enabled",
+    "employees_enabled",
 ]
 
 

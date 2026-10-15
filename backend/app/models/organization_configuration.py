@@ -57,6 +57,12 @@ class OrganizationConfiguration(Base):
         default=False,
     )
 
+    employees_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
     company = relationship(
         "Company",
         back_populates="organization_configuration",

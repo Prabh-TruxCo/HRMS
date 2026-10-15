@@ -11,10 +11,7 @@ import {
   XCircle,
 } from "lucide-react";
 
-import {
-  formatAuditValue,
-  getAuditChanges,
-} from "@/utils/audit-log";
+import { formatAuditValue, getAuditChanges } from "@/utils/audit-log";
 import { AuditLog } from "../services/auditLogService";
 
 type AuditLogModalProps = {
@@ -25,6 +22,31 @@ type AuditLogModalProps = {
   error: string | null;
   onClose: () => void;
 };
+
+function normalizeAction(action: string): string {
+  const normalized = action.toUpperCase();
+
+  switch (normalized) {
+    case "CREATE":
+    case "CREATED":
+      return "CREATED";
+
+    case "UPDATE":
+    case "UPDATED":
+      return "UPDATED";
+
+    case "ENABLE":
+    case "ENABLED":
+      return "ENABLED";
+
+    case "DISABLE":
+    case "DISABLED":
+      return "DISABLED";
+
+    default:
+      return normalized;
+  }
+}
 
 function getActionIcon(action: string) {
   switch (action) {
@@ -95,10 +117,7 @@ export default function AuditLogModal({
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--brand-color-soft)]">
-              <Activity
-                size={18}
-                className="text-[var(--brand-color)]"
-              />
+              <Activity size={18} className="text-[var(--brand-color)]" />
             </div>
 
             <div>
@@ -106,9 +125,7 @@ export default function AuditLogModal({
                 Activity Log
               </h2>
 
-              <p className="text-xs text-slate-400">
-                {entityName}
-              </p>
+              <p className="text-xs text-slate-400">{entityName}</p>
             </div>
           </div>
 
@@ -129,9 +146,7 @@ export default function AuditLogModal({
             <div className="flex flex-col items-center justify-center py-14">
               <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-[var(--brand-color)]" />
 
-              <p className="mt-3 text-sm text-slate-400">
-                Loading activity...
-              </p>
+              <p className="mt-3 text-sm text-slate-400">Loading activity...</p>
             </div>
           )}
 
@@ -143,9 +158,7 @@ export default function AuditLogModal({
                 Unable to load activity
               </div>
 
-              <p className="mt-1 text-xs text-red-500">
-                {error}
-              </p>
+              <p className="mt-1 text-xs text-red-500">{error}</p>
             </div>
           )}
 
@@ -153,10 +166,7 @@ export default function AuditLogModal({
           {!loading && !error && logs.length === 0 && (
             <div className="flex flex-col items-center justify-center py-14 text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-50">
-                <Clock3
-                  size={21}
-                  className="text-slate-400"
-                />
+                <Clock3 size={21} className="text-slate-400" />
               </div>
 
               <h3 className="mt-4 text-sm font-semibold text-slate-800">
@@ -176,19 +186,16 @@ export default function AuditLogModal({
 
               <div className="space-y-6">
                 {logs.map((log) => {
+                  const action = normalizeAction(log.action);
+
                   const changes =
-                    log.action === "UPDATED"
-                      ? getAuditChanges(log)
-                      : [];
+                    action === "UPDATED" ? getAuditChanges(log) : [];
 
                   return (
-                    <div
-                      key={log.id}
-                      className="relative flex gap-4"
-                    >
+                    <div key={log.id} className="relative flex gap-4">
                       {/* Icon */}
                       <div className="relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-[var(--brand-color)] shadow-sm">
-                        {getActionIcon(log.action)}
+                        {getActionIcon(action)}
                       </div>
 
                       {/* Event */}
@@ -196,7 +203,7 @@ export default function AuditLogModal({
                         {/* Title / Date */}
                         <div className="flex flex-col justify-between gap-1 sm:flex-row sm:items-center">
                           <p className="text-sm font-semibold text-slate-800">
-                            {getActionLabel(log.action)}
+                            {getActionLabel(action)}
                           </p>
 
                           <span className="text-[11px] text-slate-400">
@@ -236,8 +243,7 @@ export default function AuditLogModal({
                                             Added
                                           </span>
 
-                                          {change.newValue !==
-                                            undefined && (
+                                          {change.newValue !== undefined && (
                                             <span className="max-w-[220px] truncate text-slate-500">
                                               {formatAuditValue(
                                                 change.newValue,
@@ -253,8 +259,7 @@ export default function AuditLogModal({
                                             Removed
                                           </span>
 
-                                          {change.oldValue !==
-                                            undefined && (
+                                          {change.oldValue !== undefined && (
                                             <span className="max-w-[220px] truncate text-slate-500">
                                               {formatAuditValue(
                                                 change.oldValue,
@@ -267,9 +272,7 @@ export default function AuditLogModal({
                                       {change.type === "updated" && (
                                         <>
                                           <span className="max-w-[180px] truncate rounded-md bg-red-50 px-2 py-1 text-red-600">
-                                            {formatAuditValue(
-                                              change.oldValue,
-                                            )}
+                                            {formatAuditValue(change.oldValue)}
                                           </span>
 
                                           <span className="text-slate-300">
@@ -277,9 +280,7 @@ export default function AuditLogModal({
                                           </span>
 
                                           <span className="max-w-[180px] truncate rounded-md bg-emerald-50 px-2 py-1 text-emerald-600">
-                                            {formatAuditValue(
-                                              change.newValue,
-                                            )}
+                                            {formatAuditValue(change.newValue)}
                                           </span>
                                         </>
                                       )}
@@ -295,9 +296,7 @@ export default function AuditLogModal({
                         <p className="mt-3 text-[11px] text-slate-400">
                           Performed by{" "}
                           {log.user_name ||
-                            (log.user_id
-                              ? `User #${log.user_id}`
-                              : "System")}
+                            (log.user_id ? `User #${log.user_id}` : "System")}
                         </p>
                       </div>
                     </div>

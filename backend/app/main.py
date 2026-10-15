@@ -20,6 +20,7 @@ from app.api.sites import router as sites_router
 from app.api.posts import router as posts_router
 from app.api.office_location import router as office_location_router
 from app.api.shifts import router as shifts_router
+from app.api.employees import router as employees_router
 
 from pathlib import Path
 
@@ -64,6 +65,7 @@ app.include_router(sites_router, prefix="/api")
 app.include_router(posts_router, prefix="/api")
 app.include_router(office_location_router, prefix="/api")
 app.include_router(shifts_router, prefix="/api")
+app.include_router(employees_router, prefix="/api")
 
 
 @app.get("/")

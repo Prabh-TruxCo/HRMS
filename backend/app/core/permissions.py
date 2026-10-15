@@ -296,4 +296,28 @@ PERMISSIONS = [
         "description": "Allows assigning roles to company members.",
         "module": "ROLE",
     },
+    {
+        "code": "EMPLOYEE_FIELD_SETTINGS_VIEW",
+        "name": "View Employee Field Settings",
+        "description": "Allows viewing company-specific employee form field settings.",
+        "module": "EMPLOYEE",
+    },
+    {
+        "code": "EMPLOYEE_FIELD_SETTINGS_UPDATE",
+        "name": "Manage Employee Field Settings",
+        "description": "Allows configuring employee fields, labels, required status, and validation rules.",
+        "module": "EMPLOYEE",
+    },
+    {
+        "code": "EMPLOYEE_CODE_OVERRIDE",
+        "name": "Override Employee Code",
+        "description": "Allows manually specifying or changing an employee code.",
+        "module": "EMPLOYEE",
+    },
+    {
+        "code": "EMPLOYEE_SENSITIVE_VIEW",
+        "name": "View Sensitive Employee Information",
+        "description": "Allows viewing restricted employee information.",
+        "module": "EMPLOYEE",
+    },
 ]

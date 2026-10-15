@@ -32,6 +32,12 @@ from app.models.site import Site
 from app.models.post import Post
 from app.models.office_location import OfficeLocation
 from app.models.shift import Shift
+from app.models.employee import (
+    Employee,
+    EmployeeIdSequence,
+    EmployeeFieldDefinition,
+    EmployeeFieldValue,
+)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
