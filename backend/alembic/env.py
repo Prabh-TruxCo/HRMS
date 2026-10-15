@@ -31,6 +31,7 @@ from app.models.company_industry import CompanyIndustry
 from app.models.site import Site
 from app.models.post import Post
 from app.models.office_location import OfficeLocation
+from app.models.shift import Shift
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

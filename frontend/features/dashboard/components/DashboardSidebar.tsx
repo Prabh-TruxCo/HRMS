@@ -67,7 +67,10 @@ const NAV: NavSection[] = [
         label: "Workforce",
         href: "/workforce",
         icon: BriefcaseBusiness,
-        children: [{ label: "Overview", href: "/workforce", exact: true }],
+        children: [
+          { label: "Overview", href: "/workforce", exact: true },
+          { label: "Shifts", href: "/workforce/shifts" },
+        ],
       },
     ],
   },
