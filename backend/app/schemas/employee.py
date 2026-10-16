@@ -1,4 +1,3 @@
-
 from datetime import date, datetime
 from typing import Any
 
@@ -27,6 +26,7 @@ class EmployeeCreateRequest(BaseModel):
     team_id: int | None = Field(default=None, gt=0)
     branch_id: int | None = Field(default=None, gt=0)
     site_id: int | None = Field(default=None, gt=0)
+    post_id: int | None = Field(default=None, gt=0)
     employment_type_id: int | None = Field(default=None, gt=0)
     manager_id: int | None = Field(default=None, gt=0)
 
@@ -65,6 +65,7 @@ class EmployeeUpdateRequest(BaseModel):
     team_id: int | None = Field(default=None, gt=0)
     branch_id: int | None = Field(default=None, gt=0)
     site_id: int | None = Field(default=None, gt=0)
+    post_id: int | None = Field(default=None, gt=0)
     employment_type_id: int | None = Field(default=None, gt=0)
     manager_id: int | None = Field(default=None, gt=0)
 
@@ -108,6 +109,7 @@ class EmployeeResponse(BaseModel):
     team_id: int | None
     branch_id: int | None
     site_id: int | None
+    post_id: int | None
     employment_type_id: int | None
     manager_id: int | None
 

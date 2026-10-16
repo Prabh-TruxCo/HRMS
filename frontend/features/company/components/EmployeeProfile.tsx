@@ -10,8 +10,6 @@ import {
   Clock3,
   Edit3,
   Mail,
-  MapPin,
-  Phone,
   UserRound,
   Users,
 } from "lucide-react";
@@ -24,6 +22,7 @@ import {
 
 type Props = {
   companyId: number;
+  
   employeeId: number;
 };
 

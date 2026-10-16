@@ -92,6 +92,7 @@ class EmployeeService:
             "team_id",
             "branch_id",
             "site_id",
+            "post_id",
             "employment_type_id",
             "manager_id",
             "joining_date",
@@ -159,11 +160,13 @@ class EmployeeService:
         from app.models.employment_type import EmploymentType
         from app.models.site import Site
         from app.models.team import Team
+        from app.models.post import Post
 
         model_map = {
             "department_id": Department,
             "designation_id": Designation,
             "team_id": Team,
+            "post_id": Post,
             "branch_id": Branch,
             "site_id": Site,
             "employment_type_id": EmploymentType,
@@ -179,6 +182,38 @@ class EmployeeService:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=f"Invalid {field}: record does not belong to this company.",
+                )
+
+        post_id = data.get("post_id")
+
+        if post_id is not None:
+            post = db.get(Post, post_id)
+
+            if post is None or post.company_id != company_id:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Post must belong to the selected company.",
+                )
+
+            site_id = data.get("site_id")
+
+            if site_id is not None and post.site_id != site_id:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Post must belong to the selected site.",
+                )
+
+            # When updating an employee, prevent an existing post
+            # from remaining assigned to a different site.
+            if (
+                current_employee_id is not None
+                and "site_id" in data
+                and site_id is not None
+                and post.site_id != site_id
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="The assigned post does not belong to the selected site.",
                 )
 
         manager_id = data.get("manager_id")
@@ -223,15 +258,104 @@ class EmployeeService:
                 )
 
     @staticmethod
+    def _custom_fields_snapshot(
+        db: Session,
+        employee: Employee,
+    ) -> dict[str, Any]:
+        rows = db.execute(
+            select(
+                EmployeeFieldDefinition.field_key,
+                EmployeeFieldValue.value,
+            )
+            .join(
+                EmployeeFieldValue,
+                EmployeeFieldValue.field_definition_id == EmployeeFieldDefinition.id,
+            )
+            .where(
+                EmployeeFieldDefinition.company_id == employee.company_id,
+                EmployeeFieldValue.employee_id == employee.id,
+            )
+        ).all()
+
+        return {field_key: value for field_key, value in rows}
+
+    @staticmethod
+    def _validate_custom_field_value(
+        definition: EmployeeFieldDefinition,
+        value: Any,
+    ) -> None:
+        if value is None or value == "":
+            if definition.is_required:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"{definition.label} is required.",
+                )
+            return
+
+        field_type = definition.field_type.upper()
+
+        if field_type in {"TEXT", "TEXTAREA", "EMAIL", "PHONE", "DATE"}:
+            if not isinstance(value, str):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"{definition.label} must be a string.",
+                )
+
+        elif field_type == "NUMBER":
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"{definition.label} must be a number.",
+                )
+
+        elif field_type == "BOOLEAN":
+            if not isinstance(value, bool):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"{definition.label} must be true or false.",
+                )
+
+        elif field_type == "SELECT":
+            options = definition.options_json or []
+            allowed_values = (
+                [item.get("value") for item in options if isinstance(item, dict)]
+                if isinstance(options, list)
+                else list(options.keys())
+            )
+            if value not in allowed_values:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Invalid option for {definition.label}.",
+                )
+
+        elif field_type == "MULTISELECT":
+            if not isinstance(value, list):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"{definition.label} must contain a list of options.",
+                )
+
+            options = definition.options_json or []
+            allowed_values = (
+                [item.get("value") for item in options if isinstance(item, dict)]
+                if isinstance(options, list)
+                else list(options.keys())
+            )
+            if any(item not in allowed_values for item in value):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Invalid option for {definition.label}.",
+                )
+
+    @staticmethod
     def _save_custom_fields(
         db: Session,
         company_id: int,
         employee: Employee,
         custom_fields: dict[str, Any],
+        *,
+        validate_required: bool = True,
     ) -> None:
-        if not custom_fields:
-            return
-
         definitions = db.scalars(
             select(EmployeeFieldDefinition).where(
                 EmployeeFieldDefinition.company_id == company_id,
@@ -243,28 +367,53 @@ class EmployeeService:
             definition.field_key: definition for definition in definitions
         }
 
-        for field_key, value in custom_fields.items():
-            definition = definitions_by_key.get(field_key)
-            if definition is None:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=f"Unknown or inactive employee custom field: {field_key}.",
-                )
-
-            if definition.is_required and value is None:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=f"{definition.label} is required.",
-                )
-
-            existing = db.scalar(
-                select(EmployeeFieldValue).where(
-                    EmployeeFieldValue.employee_id == employee.id,
-                    EmployeeFieldValue.field_definition_id == definition.id,
-                )
+        unknown_keys = set(custom_fields) - set(definitions_by_key)
+        if unknown_keys:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Unknown or inactive employee custom field(s): "
+                    + ", ".join(sorted(unknown_keys))
+                ),
             )
 
-            if existing:
+        existing_values = {
+            row.field_definition_id: row
+            for row in db.scalars(
+                select(EmployeeFieldValue).where(
+                    EmployeeFieldValue.employee_id == employee.id
+                )
+            ).all()
+        }
+
+        submitted_keys = set(custom_fields)
+
+        for definition in definitions:
+            if (
+                validate_required
+                and definition.is_required
+                and definition.field_key not in submitted_keys
+            ):
+                existing = existing_values.get(definition.id)
+                existing_value = existing.value if existing else None
+
+                if existing_value is None or existing_value == "":
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"{definition.label} is required.",
+                    )
+
+        for field_key, value in custom_fields.items():
+            definition = definitions_by_key[field_key]
+
+            EmployeeService._validate_custom_field_value(
+                definition,
+                value,
+            )
+
+            existing = existing_values.get(definition.id)
+
+            if existing is not None:
                 existing.value = value
             else:
                 db.add(
@@ -439,6 +588,7 @@ class EmployeeService:
             db.flush()
 
             EmployeeService._save_custom_fields(db, company_id, employee, custom_fields)
+            custom_field_values = EmployeeService._custom_fields_snapshot(db, employee)
 
             EmployeeService._log(
                 db=db,
@@ -448,7 +598,10 @@ class EmployeeService:
                 employee=employee,
                 action="CREATED",
                 description=f"Created employee {employee.employee_code}.",
-                new_values=EmployeeService._employee_snapshot(employee),
+                new_values={
+                    **EmployeeService._employee_snapshot(employee),
+                    "custom_fields": custom_field_values,
+                },
             )
 
             db.commit()
@@ -481,6 +634,8 @@ class EmployeeService:
             employee = EmployeeService._get_employee(db, company_id, employee_id)
 
             old_values = EmployeeService._employee_snapshot(employee)
+            old_custom_fields = EmployeeService._custom_fields_snapshot(db, employee)
+
             payload = dict(data)
             custom_fields = payload.pop("custom_fields", {}) or {}
 
@@ -493,6 +648,32 @@ class EmployeeService:
                 payload,
                 current_employee_id=employee.id,
             )
+
+            # If the site changes but post_id is omitted, validate the
+            # employee's existing post against the new site.
+            if (
+                "site_id" in payload
+                and payload["site_id"] is not None
+                and "post_id" not in payload
+                and employee.post_id is not None
+            ):
+                from app.models.post import Post
+
+                existing_post = db.get(Post, employee.post_id)
+
+                if (
+                    existing_post is None
+                    or existing_post.company_id != company_id
+                    or existing_post.site_id != payload["site_id"]
+                ):
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=(
+                            "The employee's current post does not belong "
+                            "to the new site. Select a post for that site "
+                            "or clear the post assignment."
+                        ),
+                    )
 
             if payload.get("user_id") is not None:
                 from app.models.user import User
@@ -508,9 +689,22 @@ class EmployeeService:
                 if hasattr(employee, field):
                     setattr(employee, field, value)
 
-            EmployeeService._save_custom_fields(db, company_id, employee, custom_fields)
+            EmployeeService._save_custom_fields(
+                db,
+                company_id,
+                employee,
+                custom_fields,
+                validate_required=True,
+            )
 
-            self_new_values = EmployeeService._employee_snapshot(employee)
+            new_custom_fields = EmployeeService._custom_fields_snapshot(db, employee)
+
+            self_new_values = {
+                **EmployeeService._employee_snapshot(employee),
+                "custom_fields": new_custom_fields,
+            }
+
+            old_values["custom_fields"] = old_custom_fields
             EmployeeService._log(
                 db=db,
                 user_id=current_user.id,

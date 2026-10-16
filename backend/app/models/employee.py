@@ -83,6 +83,11 @@ class Employee(Base):
         ForeignKey("sites.id", ondelete="SET NULL"),
         index=True,
     )
+    post_id: Mapped[int | None] = mapped_column(
+        ForeignKey("posts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     employment_type_id: Mapped[int | None] = mapped_column(
         ForeignKey("employment_types.id", ondelete="SET NULL"),
         index=True,

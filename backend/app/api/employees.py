@@ -1,4 +1,3 @@
-
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -15,6 +14,13 @@ from app.schemas.employee import (
 )
 from app.services.employee_service import EmployeeService
 
+from app.schemas.employee_field import (
+    EmployeeFieldDefinitionCreateRequest,
+    EmployeeFieldDefinitionUpdateRequest,
+    EmployeeFieldDefinitionResponse,
+    EmployeeFieldDefinitionListResponse,
+)
+from app.services.employee_field_service import EmployeeFieldService
 
 router = APIRouter(
     prefix="/companies/{company_id}/employees",
@@ -62,6 +68,25 @@ def list_employees(
         team_id=team_id,
         employment_status=employment_status,
         is_active=is_active,
+    )
+
+
+@router.get(
+    "/field-definitions",
+    response_model=EmployeeFieldDefinitionListResponse,
+)
+def list_employee_field_definitions(
+    company_id: int,
+    include_inactive: bool = Query(True),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    _validate_access(db, company_id, current_user)
+
+    return EmployeeFieldService.list_fields(
+        db=db,
+        company_id=company_id,
+        include_inactive=include_inactive,
     )
 
 
@@ -116,6 +141,49 @@ def update_employee(
         db=db,
         company_id=company_id,
         employee_id=employee_id,
+        data=payload.model_dump(exclude_unset=True),
+        current_user=current_user,
+    )
+
+
+@router.post(
+    "/field-definitions",
+    response_model=EmployeeFieldDefinitionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_employee_field_definition(
+    company_id: int,
+    payload: EmployeeFieldDefinitionCreateRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    _validate_access(db, company_id, current_user)
+
+    return EmployeeFieldService.create_field(
+        db=db,
+        company_id=company_id,
+        data=payload.model_dump(),
+        current_user=current_user,
+    )
+
+
+@router.patch(
+    "/field-definitions/{field_id}",
+    response_model=EmployeeFieldDefinitionResponse,
+)
+def update_employee_field_definition(
+    company_id: int,
+    field_id: int,
+    payload: EmployeeFieldDefinitionUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    _validate_access(db, company_id, current_user)
+
+    return EmployeeFieldService.update_field(
+        db=db,
+        company_id=company_id,
+        field_id=field_id,
         data=payload.model_dump(exclude_unset=True),
         current_user=current_user,
     )

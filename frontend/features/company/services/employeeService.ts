@@ -1,6 +1,4 @@
-
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
 
 export type Employee = {
   id: number;
@@ -27,6 +25,7 @@ export type Employee = {
   joining_date: string | null;
   probation_end_date: string | null;
   confirmation_date: string | null;
+  post_id: number | null;
   employment_end_date: string | null;
   employment_status: string;
   is_active: boolean;
@@ -55,6 +54,7 @@ export type EmployeePayload = {
   team_id?: number | null;
   branch_id?: number | null;
   site_id?: number | null;
+  post_id?: number | null;
   employment_type_id?: number | null;
   manager_id?: number | null;
   joining_date?: string | null;
@@ -179,15 +179,12 @@ export async function createEmployee(
   companyId: number,
   payload: EmployeePayload,
 ): Promise<Employee> {
-  const response = await fetch(
-    `${API_URL}/companies/${companyId}/employees`,
-    {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    },
-  );
+  const response = await fetch(`${API_URL}/companies/${companyId}/employees`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
 
   return handleResponse<Employee>(response);
 }
@@ -208,4 +205,68 @@ export async function updateEmployee(
   );
 
   return handleResponse<Employee>(response);
+}
+
+export type EmployeeFieldType =
+  | "TEXT"
+  | "TEXTAREA"
+  | "NUMBER"
+  | "DATE"
+  | "EMAIL"
+  | "PHONE"
+  | "BOOLEAN"
+  | "SELECT"
+  | "MULTISELECT";
+
+export interface EmployeeFieldOption {
+  label: string;
+  value: string | number;
+}
+
+export interface EmployeeFieldDefinition {
+  id: number;
+  company_id: number;
+  field_key: string;
+  label: string;
+  section: string;
+  description: string | null;
+  field_type: EmployeeFieldType;
+  is_required: boolean;
+  is_active: boolean;
+  display_order: number;
+  options_json: EmployeeFieldOption[] | Record<string, unknown> | null;
+  validation_json: Record<string, unknown> | null;
+  is_searchable: boolean;
+}
+
+export interface EmployeeFieldDefinitionList {
+  fields: EmployeeFieldDefinition[];
+  total: number;
+}
+
+/**
+ * Fetch active custom employee fields for the selected company.
+ */
+export async function getEmployeeFieldDefinitions(
+  companyId: number,
+): Promise<EmployeeFieldDefinition[]> {
+  const response = await fetch(
+    `${API_URL}/companies/${companyId}/employees/field-definitions`,
+    {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+      },
+    },
+  );
+
+  const data = await handleResponse(response);
+
+  // Support either a wrapped response or a direct array.
+  if (Array.isArray(data)) {
+    return data as EmployeeFieldDefinition[];
+  }
+
+  return (data as EmployeeFieldDefinitionList).fields ?? [];
 }

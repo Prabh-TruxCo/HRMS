@@ -6,12 +6,15 @@ import { Activity, Pencil, Power, Plus, Search, Users } from "lucide-react";
 import AuditLogModal from "./AuditLogModal";
 import StatusConfirmModal from "@/components/feedback/StatusConfirmModal";
 import { useSnackbar } from "@/components/feedback/SnackbarProvider";
+import { useCompany } from "@/features/company/context/CompanyContext";
 import {
   createEmployee,
   getEmployees,
   updateEmployee,
   type Employee,
   type EmployeePayload,
+  type EmployeeFieldDefinition,
+  getEmployeeFieldDefinitions,
 } from "@/features/company/services/employeeService";
 import {
   getEntityAuditLogs,
@@ -21,30 +24,22 @@ import { useRouter } from "next/navigation";
 type Props = {
   companyId: number | null;
 };
+import {
+  EmployeeFormField as Field,
+  inputClass,
+} from "./employees/employee-form/EmployeeFormField";
+import PersonalDetailsSection from "./employees/employee-form/PersonalDetailsSection";
+import EmploymentDetailsSection from "./employees/employee-form/EmploymentDetailsSection";
+import type { EmployeeForm } from "./employees/employee-form/employeeForm.types";
+import JobDetailsSection from "./employees/employee-form/JobDetailsSection";
 
-type EmployeeForm = {
-  first_name: string;
-  middle_name: string;
-  last_name: string;
-  display_name: string;
-  employee_code: string;
-  personal_email: string;
-  work_email: string;
-  phone: string;
-  alternate_phone: string;
-  date_of_birth: string;
-  gender: string;
-  joining_date: string;
-  probation_end_date: string;
-  confirmation_date: string;
-  employment_end_date: string;
-  employment_status: string;
-  is_active: boolean;
-  height_cm: string;
-  weight_kg: string;
-  notes: string;
-};
-
+import { getDepartments } from "../services/departmentService";
+import { getDesignations } from "../services/designationService";
+import { getTeams } from "../services/teamService";
+import { getBranches } from "../services/branchService";
+import { getSites } from "../services/siteService";
+import { getPosts } from "../services/postService";
+import { getEmploymentTypes } from "../services/employmentService";
 const EMPTY_FORM: EmployeeForm = {
   first_name: "",
   middle_name: "",
@@ -66,6 +61,14 @@ const EMPTY_FORM: EmployeeForm = {
   height_cm: "",
   weight_kg: "",
   notes: "",
+  department_id: "",
+  designation_id: "",
+  team_id: "",
+  branch_id: "",
+  site_id: "",
+  employment_type_id: "",
+  manager_id: "",
+  post_id: "",
 };
 
 const STATUSES = [
@@ -105,6 +108,25 @@ function toForm(employee: Employee): EmployeeForm {
     height_cm: employee.height_cm == null ? "" : String(employee.height_cm),
     weight_kg: employee.weight_kg == null ? "" : String(employee.weight_kg),
     notes: employee.notes ?? "",
+    department_id:
+      employee.department_id == null ? "" : String(employee.department_id),
+
+    designation_id:
+      employee.designation_id == null ? "" : String(employee.designation_id),
+
+    team_id: employee.team_id == null ? "" : String(employee.team_id),
+
+    branch_id: employee.branch_id == null ? "" : String(employee.branch_id),
+
+    site_id: employee.site_id == null ? "" : String(employee.site_id),
+
+    employment_type_id:
+      employee.employment_type_id == null
+        ? ""
+        : String(employee.employment_type_id),
+
+    manager_id: employee.manager_id == null ? "" : String(employee.manager_id),
+    post_id: employee.post_id == null ? "" : String(employee.post_id),
   };
 }
 
@@ -130,6 +152,22 @@ function toPayload(form: EmployeeForm): EmployeePayload {
     height_cm: form.height_cm ? Number(form.height_cm) : null,
     weight_kg: form.weight_kg ? Number(form.weight_kg) : null,
     notes: form.notes.trim() || null,
+    department_id: form.department_id ? Number(form.department_id) : null,
+
+    designation_id: form.designation_id ? Number(form.designation_id) : null,
+
+    team_id: form.team_id ? Number(form.team_id) : null,
+
+    branch_id: form.branch_id ? Number(form.branch_id) : null,
+
+    site_id: form.site_id ? Number(form.site_id) : null,
+
+    employment_type_id: form.employment_type_id
+      ? Number(form.employment_type_id)
+      : null,
+
+    manager_id: form.manager_id ? Number(form.manager_id) : null,
+    post_id: form.post_id ? Number(form.post_id) : null,
   };
 }
 
@@ -185,7 +223,26 @@ export default function EmployeeManagement({ companyId }: Props) {
   const [auditOpen, setAuditOpen] = useState(false);
   const [auditEntityName, setAuditEntityName] = useState("");
   const router = useRouter();
+  const [customFieldDefinitions, setCustomFieldDefinitions] = useState<
+    EmployeeFieldDefinition[]
+  >([]);
+  const [customFieldsLoading, setCustomFieldsLoading] = useState(false);
+  type AssignmentOption = {
+    id: number;
+    name: string;
+  };
 
+  const [departments, setDepartments] = useState<AssignmentOption[]>([]);
+  const [designations, setDesignations] = useState<AssignmentOption[]>([]);
+  const [teams, setTeams] = useState<AssignmentOption[]>([]);
+  const [branches, setBranches] = useState<AssignmentOption[]>([]);
+  const [sites, setSites] = useState<AssignmentOption[]>([]);
+  const [posts, setPosts] = useState<AssignmentOption[]>([]);
+  const [employmentTypes, setEmploymentTypes] = useState<AssignmentOption[]>(
+    [],
+  );
+  const [managers, setManagers] = useState<AssignmentOption[]>([]);
+  const { currentCompany } = useCompany();
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       setPage(1);
@@ -252,6 +309,100 @@ export default function EmployeeManagement({ companyId }: Props) {
     refreshKey,
     showError,
   ]);
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCustomFieldDefinitions() {
+      if (!companyId) {
+        setCustomFieldDefinitions([]);
+        return;
+      }
+
+      setCustomFieldsLoading(true);
+
+      try {
+        const definitions = await getEmployeeFieldDefinitions(companyId);
+
+        if (!cancelled) {
+          setCustomFieldDefinitions(
+            definitions
+              .filter((field) => field.is_active)
+              .sort(
+                (a, b) =>
+                  a.display_order - b.display_order ||
+                  a.label.localeCompare(b.label),
+              ),
+          );
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Failed to load employee field definitions:", error);
+        }
+      } finally {
+        if (!cancelled) {
+          setCustomFieldsLoading(false);
+        }
+      }
+    }
+
+    void loadCustomFieldDefinitions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId]);
+
+  useEffect(() => {
+    const companyId = currentCompany?.id;
+
+    if (!companyId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadAssignmentOptions = async () => {
+      try {
+        const [
+          departmentResult,
+          designationResult,
+          teamResult,
+          branchResult,
+          siteResult,
+          postResult,
+          employmentTypeResult,
+        ] = await Promise.all([
+          getDepartments(companyId),
+          getDesignations(companyId),
+          getTeams(companyId),
+          getBranches(companyId),
+          getSites(companyId),
+          getPosts(companyId),
+          getEmploymentTypes(companyId),
+        ]);
+
+        if (cancelled) return;
+
+        setDepartments(departmentResult.departments);
+        setDesignations(designationResult.designations);
+        setTeams(teamResult.teams);
+        setBranches(branchResult.branches);
+        setSites(siteResult.sites);
+        setPosts(postResult.posts);
+        setEmploymentTypes(employmentTypeResult);
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Failed to load employee assignment options:", error);
+        }
+      }
+    };
+
+    void loadAssignmentOptions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentCompany?.id]);
 
   function openCreateModal() {
     setEditingEmployee(null);
@@ -687,224 +838,32 @@ export default function EmployeeManagement({ companyId }: Props) {
                   </div>
                 )}
 
-                <section>
-                  <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Personal Information
-                  </h4>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <Field label="First Name *">
-                      <input
-                        required
-                        maxLength={100}
-                        value={form.first_name}
-                        onChange={(e) =>
-                          updateField("first_name", e.target.value)
-                        }
-                        className={inputClass}
-                        placeholder="First name"
-                      />
-                    </Field>
-                    <Field label="Middle Name">
-                      <input
-                        value={form.middle_name}
-                        onChange={(e) =>
-                          updateField("middle_name", e.target.value)
-                        }
-                        className={inputClass}
-                        placeholder="Middle name"
-                      />
-                    </Field>
-                    <Field label="Last Name">
-                      <input
-                        value={form.last_name}
-                        onChange={(e) =>
-                          updateField("last_name", e.target.value)
-                        }
-                        className={inputClass}
-                        placeholder="Last name"
-                      />
-                    </Field>
-                    <Field label="Display Name">
-                      <input
-                        value={form.display_name}
-                        onChange={(e) =>
-                          updateField("display_name", e.target.value)
-                        }
-                        className={inputClass}
-                        placeholder="Preferred display name"
-                      />
-                    </Field>
-                    <Field label="Employee Code">
-                      <input
-                        value={form.employee_code}
-                        disabled={Boolean(editingEmployee)}
-                        onChange={(e) =>
-                          updateField("employee_code", e.target.value)
-                        }
-                        className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`}
-                        placeholder={
-                          editingEmployee ? "" : "Auto-generated if blank"
-                        }
-                      />
-                    </Field>
-                    <Field label="Date of Birth">
-                      <input
-                        type="date"
-                        value={form.date_of_birth}
-                        onChange={(e) =>
-                          updateField("date_of_birth", e.target.value)
-                        }
-                        className={inputClass}
-                      />
-                    </Field>
-                    <Field label="Gender">
-                      <select
-                        value={form.gender}
-                        onChange={(e) => updateField("gender", e.target.value)}
-                        className={inputClass}
-                      >
-                        <option value="">Not specified</option>
-                        <option value="MALE">Male</option>
-                        <option value="FEMALE">Female</option>
-                        <option value="OTHER">Other</option>
-                        <option value="PREFER_NOT_TO_SAY">
-                          Prefer not to say
-                        </option>
-                      </select>
-                    </Field>
-                    <Field label="Phone">
-                      <input
-                        type="tel"
-                        value={form.phone}
-                        onChange={(e) => updateField("phone", e.target.value)}
-                        className={inputClass}
-                        placeholder="Phone number"
-                      />
-                    </Field>
+                <PersonalDetailsSection
+                  form={form}
+                  updateField={updateField}
+                  editingEmployee={Boolean(editingEmployee)}
+                />
 
-                    <Field label="Alternate Phone">
-                      <input
-                        type="tel"
-                        value={form.alternate_phone}
-                        onChange={(e) =>
-                          updateField("alternate_phone", e.target.value)
-                        }
-                        className={inputClass}
-                        placeholder="Alternate phone number"
-                      />
-                    </Field>
+                <EmploymentDetailsSection
+                  form={form}
+                  updateField={updateField}
+                  statuses={STATUSES}
+                  prettyStatus={prettyStatus}
+                />
 
-                    <Field label="Personal Email">
-                      <input
-                        type="email"
-                        value={form.personal_email}
-                        onChange={(e) =>
-                          updateField("personal_email", e.target.value)
-                        }
-                        className={inputClass}
-                        placeholder="name@example.com"
-                      />
-                    </Field>
-                    <Field label="Work Email">
-                      <input
-                        type="email"
-                        value={form.work_email}
-                        onChange={(e) =>
-                          updateField("work_email", e.target.value)
-                        }
-                        className={inputClass}
-                        placeholder="name@company.com"
-                      />
-                    </Field>
-                  </div>
-                </section>
-
-                <section>
-                  <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Employment Information
-                  </h4>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <Field label="Joining Date">
-                      <input
-                        type="date"
-                        value={form.joining_date}
-                        onChange={(e) =>
-                          updateField("joining_date", e.target.value)
-                        }
-                        className={inputClass}
-                      />
-                    </Field>
-                    <Field label="Employment Status">
-                      <select
-                        required
-                        value={form.employment_status}
-                        onChange={(e) =>
-                          updateField("employment_status", e.target.value)
-                        }
-                        className={inputClass}
-                      >
-                        {STATUSES.map((item) => (
-                          <option key={item} value={item}>
-                            {prettyStatus(item)}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                    <Field label="Record Status">
-                      <select
-                        value={String(form.is_active)}
-                        onChange={(e) =>
-                          updateField("is_active", e.target.value === "true")
-                        }
-                        className={inputClass}
-                      >
-                        <option value="true">Enabled</option>
-                        <option value="false">Disabled</option>
-                      </select>
-                    </Field>
-                  </div>
-                </section>
-
-                <section>
-                  <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Employment Timeline
-                  </h4>
-
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <Field label="Probation End Date">
-                      <input
-                        type="date"
-                        value={form.probation_end_date}
-                        onChange={(e) =>
-                          updateField("probation_end_date", e.target.value)
-                        }
-                        className={inputClass}
-                      />
-                    </Field>
-
-                    <Field label="Confirmation Date">
-                      <input
-                        type="date"
-                        value={form.confirmation_date}
-                        onChange={(e) =>
-                          updateField("confirmation_date", e.target.value)
-                        }
-                        className={inputClass}
-                      />
-                    </Field>
-
-                    <Field label="Employment End Date">
-                      <input
-                        type="date"
-                        value={form.employment_end_date}
-                        onChange={(e) =>
-                          updateField("employment_end_date", e.target.value)
-                        }
-                        className={inputClass}
-                      />
-                    </Field>
-                  </div>
-                </section>
+                <JobDetailsSection
+                  form={form}
+                  updateField={updateField}
+                  departments={departments}
+                  designations={designations}
+                  teams={teams}
+                  branches={branches}
+                  sites={sites}
+                  posts={posts}
+                  employmentTypes={employmentTypes}
+                  managers={managers}
+                  loading={loading}
+                />
 
                 <section>
                   <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -1007,26 +966,6 @@ export default function EmployeeManagement({ companyId }: Props) {
           setAuditEntityName("");
         }}
       />
-    </div>
-  );
-}
-
-const inputClass =
-  "h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none placeholder:text-slate-400 focus:border-[var(--brand-color)] focus:ring-2 focus:ring-[var(--brand-color-soft)]";
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="min-w-0">
-      <label className="mb-1 block text-xs font-medium text-slate-700">
-        {label}
-      </label>
-      {children}
     </div>
   );
 }

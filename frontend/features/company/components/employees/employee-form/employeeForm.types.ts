@@ -1,0 +1,31 @@
+
+export type EmployeeForm = {
+  first_name: string;
+  middle_name: string;
+  last_name: string;
+  display_name: string;
+  employee_code: string;
+  personal_email: string;
+  work_email: string;
+  phone: string;
+  alternate_phone: string;
+  date_of_birth: string;
+  gender: string;
+  joining_date: string;
+  probation_end_date: string;
+  confirmation_date: string;
+  employment_end_date: string;
+  employment_status: string;
+  is_active: boolean;
+  height_cm: string;
+  weight_kg: string;
+  notes: string;
+  department_id: string;
+  designation_id: string;
+  team_id: string;
+  branch_id: string;
+  site_id: string;
+  employment_type_id: string;
+  manager_id: string;
+  post_id: string;
+};
