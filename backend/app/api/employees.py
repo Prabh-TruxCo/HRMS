@@ -22,6 +22,14 @@ from app.schemas.employee_field import (
 )
 from app.services.employee_field_service import EmployeeFieldService
 
+from app.schemas.employee_id_settings import (
+    EmployeeIdSettingsUpdate,
+    EmployeeIdSettingsResponse,
+)
+from app.services.employee_id_settings_service import (
+    EmployeeIdSettingsService,
+)
+
 router = APIRouter(
     prefix="/companies/{company_id}/employees",
     tags=["Employees"],
@@ -87,6 +95,42 @@ def list_employee_field_definitions(
         db=db,
         company_id=company_id,
         include_inactive=include_inactive,
+    )
+
+
+@router.get(
+    "/id-settings",
+    response_model=EmployeeIdSettingsResponse,
+)
+def get_employee_id_settings(
+    company_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    _validate_access(db, company_id, current_user)
+
+    return EmployeeIdSettingsService.get_settings(
+        db=db,
+        company_id=company_id,
+    )
+
+
+@router.put(
+    "/id-settings",
+    response_model=EmployeeIdSettingsResponse,
+)
+def update_employee_id_settings(
+    company_id: int,
+    payload: EmployeeIdSettingsUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    _validate_access(db, company_id, current_user)
+
+    return EmployeeIdSettingsService.update_settings(
+        db=db,
+        company_id=company_id,
+        payload=payload,
     )
 
 

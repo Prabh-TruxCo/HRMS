@@ -32,10 +32,10 @@ def get_posts(
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
     search: str | None = Query(None, max_length=150),
+    site_id: int | None = Query(None, ge=1),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-
     validate_organization_module_access(
         db,
         company_id,
@@ -49,6 +49,7 @@ def get_posts(
         page=page,
         page_size=page_size,
         search=search,
+        site_id=site_id,
     )
 
     return {

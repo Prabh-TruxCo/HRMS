@@ -32,9 +32,7 @@ def _validate_site(
     )
 
     if site is None:
-        raise ValueError(
-            "The selected site does not belong to this company."
-        )
+        raise ValueError("The selected site does not belong to this company.")
 
     if not site.is_active:
         raise ValueError("The selected site is inactive.")
@@ -49,6 +47,7 @@ def list_posts(
     page: int = 1,
     page_size: int = 10,
     search: str | None = None,
+    site_id: int | None = None,
 ) -> tuple[list[Post], int]:
     query = (
         db.query(Post)
@@ -56,6 +55,11 @@ def list_posts(
         .filter(Post.company_id == company_id)
     )
 
+    # Filter by the selected site, when provided.
+    if site_id is not None:
+        query = query.filter(Post.site_id == site_id)
+
+    # Preserve the existing search functionality.
     if search and search.strip():
         term = f"%{search.strip()}%"
 
@@ -68,8 +72,10 @@ def list_posts(
             )
         )
 
+    # Count results after applying all filters.
     total = query.count()
 
+    # Apply sorting and pagination to the filtered results.
     posts = (
         query.order_by(Post.name.asc(), Post.id.asc())
         .offset((page - 1) * page_size)
@@ -95,7 +101,6 @@ def get_post(
     )
 
 
-
 def _audit_values(post: Post) -> dict:
     return {
         "site_id": post.site_id,
@@ -110,7 +115,6 @@ def _audit_values(post: Post) -> dict:
     }
 
 
-
 def create_post(
     db: Session,
     company_id: int,
@@ -122,9 +126,9 @@ def create_post(
     description: str | None = None,
     is_active: bool = True,
     latitude: float | None = None,
-longitude: float | None = None,
-geofence_radius: int | None = None,
-is_geofence_enabled: bool = False,
+    longitude: float | None = None,
+    geofence_radius: int | None = None,
+    is_geofence_enabled: bool = False,
 ) -> Post:
     _validate_site(db, company_id, site_id)
 
@@ -134,15 +138,13 @@ is_geofence_enabled: bool = False,
         name=name.strip(),
         code=code.strip() if code and code.strip() else None,
         description=(
-            description.strip()
-            if description and description.strip()
-            else None
+            description.strip() if description and description.strip() else None
         ),
         is_active=is_active,
         latitude=latitude,
-longitude=longitude,
-geofence_radius=geofence_radius,
-is_geofence_enabled=is_geofence_enabled,
+        longitude=longitude,
+        geofence_radius=geofence_radius,
+        is_geofence_enabled=is_geofence_enabled,
     )
 
     db.add(post)
@@ -169,9 +171,7 @@ is_geofence_enabled=is_geofence_enabled,
 
     except IntegrityError as exc:
         db.rollback()
-        raise ValueError(
-            "A post with this name already exists at this site."
-        ) from exc
+        raise ValueError("A post with this name already exists at this site.") from exc
     except Exception:
         db.rollback()
         raise
@@ -189,9 +189,9 @@ def update_post(
     code: str | None = None,
     description: str | None = None,
     latitude: float | None = None,
-longitude: float | None = None,
-geofence_radius: int | None = None,
-is_geofence_enabled: bool = False,
+    longitude: float | None = None,
+    geofence_radius: int | None = None,
+    is_geofence_enabled: bool = False,
     is_active: bool,
 ) -> Post:
     _validate_site(db, post.company_id, site_id)
@@ -202,9 +202,7 @@ is_geofence_enabled: bool = False,
     post.name = name.strip()
     post.code = code.strip() if code and code.strip() else None
     post.description = (
-        description.strip()
-        if description and description.strip()
-        else None
+        description.strip() if description and description.strip() else None
     )
     post.latitude = latitude
     post.longitude = longitude
@@ -243,9 +241,7 @@ is_geofence_enabled: bool = False,
 
     except IntegrityError as exc:
         db.rollback()
-        raise ValueError(
-            "A post with this name already exists at this site."
-        ) from exc
+        raise ValueError("A post with this name already exists at this site.") from exc
     except Exception:
         db.rollback()
         raise

@@ -68,6 +68,9 @@ export default function PostManagement({ companyId }: PostManagementProps) {
   const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
+
+  const [selectedSiteFilter, setSelectedSiteFilter] = useState("all");
+
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -115,6 +118,10 @@ export default function PostManagement({ companyId }: PostManagementProps) {
           page,
           page_size: pageSize,
           search: debouncedSearch || undefined,
+          site_id:
+            selectedSiteFilter === "all"
+              ? undefined
+              : Number(selectedSiteFilter),
         });
 
         if (signal?.aborted) return;
@@ -136,7 +143,8 @@ export default function PostManagement({ companyId }: PostManagementProps) {
         }
       }
     },
-    [companyId, page, pageSize, debouncedSearch],
+
+    [companyId, page, pageSize, debouncedSearch, selectedSiteFilter],
   );
 
   useEffect(() => {
@@ -461,30 +469,54 @@ export default function PostManagement({ companyId }: PostManagementProps) {
       )}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative w-full sm:max-w-sm">
-          <Search
-            size={15}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
-          />
-          <input
-            value={search}
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="relative w-full sm:max-w-sm">
+            <Search
+              size={15}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
+            />
+
+            <input
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
+              placeholder="Search posts..."
+              className={`${inputClass} pl-9`}
+            />
+
+            {search && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setPage(1);
+                }}
+                title="Clear search"
+                className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          <select
+            value={selectedSiteFilter}
             onChange={(event) => {
-              setSearch(event.target.value);
+              setSelectedSiteFilter(event.target.value);
               setPage(1);
             }}
-            placeholder="Search posts..."
-            className={`${inputClass} pl-9`}
-          />
-          {search && (
-            <button
-              type="button"
-              onClick={() => setSearch("")}
-              title="Clear search"
-              className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"
-            >
-              <X size={14} />
-            </button>
-          )}
+            aria-label="Filter posts by site"
+            className={`${inputClass} sm:w-56`}
+          >
+            <option value="all">All Sites</option>
+            {sites.map((site) => (
+              <option key={site.id} value={site.id}>
+                {site.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         <p className="text-xs text-[var(--text-secondary)]">

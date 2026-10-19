@@ -115,10 +115,7 @@ class EmployeeService:
         }
 
     @staticmethod
-    def _generate_employee_code(
-        db: Session,
-        company_id: int,
-    ) -> str:
+    def _generate_employee_code(db, company_id: int) -> str:
         sequence = db.scalar(
             select(EmployeeIdSequence)
             .where(EmployeeIdSequence.company_id == company_id)
@@ -126,6 +123,7 @@ class EmployeeService:
         )
 
         if sequence is None:
+            # Create the company sequence if it does not exist.
             sequence = EmployeeIdSequence(
                 company_id=company_id,
                 prefix="EMP",
@@ -135,7 +133,7 @@ class EmployeeService:
             db.add(sequence)
             db.flush()
 
-            # Lock the newly created sequence row.
+            # The current transaction now owns the inserted row.
             sequence = db.scalar(
                 select(EmployeeIdSequence)
                 .where(EmployeeIdSequence.company_id == company_id)
@@ -143,9 +141,51 @@ class EmployeeService:
             )
 
         number = sequence.next_number
+        prefix = sequence.prefix
+        padding = sequence.number_padding
+
+        employee_code = f"{prefix}{number:0{padding}d}"
+
         sequence.next_number = number + 1
 
-        return f"{sequence.prefix}" f"{number:0{sequence.number_padding}d}"
+        return employee_code
+
+    @staticmethod
+    def _format_employee_code(
+        raw_code: str,
+        sequence: EmployeeIdSequence,
+    ) -> str:
+        raw_code = raw_code.strip()
+
+        if not raw_code:
+            raise HTTPException(
+                status_code=422,
+                detail="Employee ID cannot be empty.",
+            )
+
+        # Numeric input, e.g. 101 -> TRX00101
+        if raw_code.isdigit():
+            return f"{sequence.prefix}" f"{int(raw_code):0{sequence.number_padding}d}"
+
+        # Already formatted input, e.g. TRX00350
+        prefix = sequence.prefix.upper()
+        code_upper = raw_code.upper()
+
+        if not code_upper.startswith(prefix):
+            raise HTTPException(
+                status_code=422,
+                detail=f"Employee ID must start with '{prefix}' or contain only digits.",
+            )
+
+        number_part = code_upper[len(prefix) :]
+
+        if not number_part.isdigit():
+            raise HTTPException(
+                status_code=422,
+                detail="Employee ID must contain a numeric suffix.",
+            )
+
+        return f"{prefix}{int(number_part):0{sequence.number_padding}d}"
 
     @staticmethod
     def _validate_linked_records(
@@ -543,17 +583,57 @@ class EmployeeService:
             custom_fields = payload.pop("custom_fields", {}) or {}
             supplied_code = payload.get("employee_code")
 
-            if supplied_code is not None:
-                supplied_code = supplied_code.strip()
-                if not supplied_code:
-                    raise HTTPException(
-                        status_code=422,
-                        detail="Employee code cannot be blank.",
+            if supplied_code is not None and supplied_code.strip():
+                sequence = db.scalar(
+                    select(EmployeeIdSequence)
+                    .where(EmployeeIdSequence.company_id == company_id)
+                    .with_for_update()
+                )
+
+                if sequence is None:
+                    sequence = EmployeeIdSequence(
+                        company_id=company_id,
+                        prefix="EMP",
+                        next_number=1,
+                        number_padding=4,
                     )
-                payload["employee_code"] = supplied_code
+                    db.add(sequence)
+                    db.flush()
+
+                    sequence = db.scalar(
+                        select(EmployeeIdSequence)
+                        .where(EmployeeIdSequence.company_id == company_id)
+                        .with_for_update()
+                    )
+
+                payload["employee_code"] = EmployeeService._format_employee_code(
+                    supplied_code,
+                    sequence,
+                )
+
+                # Keep automatic numbering ahead of manually assigned numeric IDs.
+                prefix = sequence.prefix.upper()
+                formatted_code = payload["employee_code"].upper()
+
+                if formatted_code.startswith(prefix):
+                    number_part = formatted_code[len(prefix) :]
+
+                    if number_part.isdigit():
+                        sequence.next_number = max(
+                            sequence.next_number,
+                            int(number_part) + 1,
+                        )
+
+            elif supplied_code is not None:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Employee code cannot be blank.",
+                )
+
             else:
                 payload["employee_code"] = EmployeeService._generate_employee_code(
-                    db, company_id
+                    db,
+                    company_id,
                 )
 
             EmployeeService._validate_linked_records(db, company_id, payload)

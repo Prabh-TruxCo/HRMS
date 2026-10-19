@@ -1,12 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Activity, Pencil, Power, Plus, Search, Users } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import AuditLogModal from "./AuditLogModal";
 import StatusConfirmModal from "@/components/feedback/StatusConfirmModal";
 import { useSnackbar } from "@/components/feedback/SnackbarProvider";
 import { useCompany } from "@/features/company/context/CompanyContext";
+
+import {
+  getOrganizationConfiguration,
+  type OrganizationConfiguration,
+} from "@/features/company/services/organizationService";
+
 import {
   createEmployee,
   getEmployees,
@@ -16,22 +23,21 @@ import {
   type EmployeeFieldDefinition,
   getEmployeeFieldDefinitions,
 } from "@/features/company/services/employeeService";
+
 import {
   getEntityAuditLogs,
   type AuditLog,
 } from "@/features/company/services/auditLogService";
-import { useRouter } from "next/navigation";
-type Props = {
-  companyId: number | null;
-};
+
 import {
   EmployeeFormField as Field,
   inputClass,
 } from "./employees/employee-form/EmployeeFormField";
+
 import PersonalDetailsSection from "./employees/employee-form/PersonalDetailsSection";
 import EmploymentDetailsSection from "./employees/employee-form/EmploymentDetailsSection";
-import type { EmployeeForm } from "./employees/employee-form/employeeForm.types";
 import JobDetailsSection from "./employees/employee-form/JobDetailsSection";
+import type { EmployeeForm } from "./employees/employee-form/employeeForm.types";
 
 import { getDepartments } from "../services/departmentService";
 import { getDesignations } from "../services/designationService";
@@ -40,6 +46,16 @@ import { getBranches } from "../services/branchService";
 import { getSites } from "../services/siteService";
 import { getPosts } from "../services/postService";
 import { getEmploymentTypes } from "../services/employmentService";
+
+type Props = {
+  companyId: number | null;
+};
+
+type AssignmentOption = {
+  id: number;
+  name: string;
+};
+
 const EMPTY_FORM: EmployeeForm = {
   first_name: "",
   middle_name: "",
@@ -82,6 +98,21 @@ const STATUSES = [
   "INACTIVE",
 ];
 
+const EMPLOYEE_FORM_STEPS = [
+  {
+    title: "Personal Information",
+    description: "Basic identity and contact details",
+  },
+  {
+    title: "Employment Details",
+    description: "Employment status and important dates",
+  },
+  {
+    title: "Organization & Job Assignment",
+    description: "Department, designation, location, and reporting",
+  },
+] as const;
+
 function toDateInput(value: string | null | undefined) {
   return value ? value.slice(0, 10) : "";
 }
@@ -110,21 +141,15 @@ function toForm(employee: Employee): EmployeeForm {
     notes: employee.notes ?? "",
     department_id:
       employee.department_id == null ? "" : String(employee.department_id),
-
     designation_id:
       employee.designation_id == null ? "" : String(employee.designation_id),
-
     team_id: employee.team_id == null ? "" : String(employee.team_id),
-
     branch_id: employee.branch_id == null ? "" : String(employee.branch_id),
-
     site_id: employee.site_id == null ? "" : String(employee.site_id),
-
     employment_type_id:
       employee.employment_type_id == null
         ? ""
         : String(employee.employment_type_id),
-
     manager_id: employee.manager_id == null ? "" : String(employee.manager_id),
     post_id: employee.post_id == null ? "" : String(employee.post_id),
   };
@@ -153,19 +178,13 @@ function toPayload(form: EmployeeForm): EmployeePayload {
     weight_kg: form.weight_kg ? Number(form.weight_kg) : null,
     notes: form.notes.trim() || null,
     department_id: form.department_id ? Number(form.department_id) : null,
-
     designation_id: form.designation_id ? Number(form.designation_id) : null,
-
     team_id: form.team_id ? Number(form.team_id) : null,
-
     branch_id: form.branch_id ? Number(form.branch_id) : null,
-
     site_id: form.site_id ? Number(form.site_id) : null,
-
     employment_type_id: form.employment_type_id
       ? Number(form.employment_type_id)
       : null,
-
     manager_id: form.manager_id ? Number(form.manager_id) : null,
     post_id: form.post_id ? Number(form.post_id) : null,
   };
@@ -196,6 +215,8 @@ function prettyStatus(value: string) {
 
 export default function EmployeeManagement({ companyId }: Props) {
   const { showSuccess, showError } = useSnackbar();
+  const { currentCompany } = useCompany();
+  const router = useRouter();
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(false);
@@ -222,15 +243,23 @@ export default function EmployeeManagement({ companyId }: Props) {
   const [auditError, setAuditError] = useState<string | null>(null);
   const [auditOpen, setAuditOpen] = useState(false);
   const [auditEntityName, setAuditEntityName] = useState("");
-  const router = useRouter();
+  const [activeFormStep, setActiveFormStep] = useState(0);
+  const searchParams = useSearchParams();
+  const action = searchParams.get("action");
+
   const [customFieldDefinitions, setCustomFieldDefinitions] = useState<
     EmployeeFieldDefinition[]
   >([]);
   const [customFieldsLoading, setCustomFieldsLoading] = useState(false);
-  type AssignmentOption = {
-    id: number;
-    name: string;
-  };
+
+  const [organizationConfiguration, setOrganizationConfiguration] =
+    useState<OrganizationConfiguration | null>(null);
+  const [
+    organizationConfigurationLoading,
+    setOrganizationConfigurationLoading,
+  ] = useState(false);
+  const [organizationConfigurationError, setOrganizationConfigurationError] =
+    useState<string | null>(null);
 
   const [departments, setDepartments] = useState<AssignmentOption[]>([]);
   const [designations, setDesignations] = useState<AssignmentOption[]>([]);
@@ -241,8 +270,22 @@ export default function EmployeeManagement({ companyId }: Props) {
   const [employmentTypes, setEmploymentTypes] = useState<AssignmentOption[]>(
     [],
   );
-  const [managers, setManagers] = useState<AssignmentOption[]>([]);
-  const { currentCompany } = useCompany();
+  const [managers] = useState<AssignmentOption[]>([]);
+
+  const configurationReady =
+    organizationConfiguration !== null &&
+    organizationConfiguration.company_id === companyId &&
+    !organizationConfigurationLoading;
+
+  const showDepartments =
+    organizationConfiguration?.departments_enabled === true;
+  const showDesignations =
+    organizationConfiguration?.designations_enabled === true;
+  const showTeams = organizationConfiguration?.teams_enabled === true;
+  const showBranches = organizationConfiguration?.branches_enabled === true;
+  const showSites = organizationConfiguration?.sites_enabled === true;
+  const showPosts = organizationConfiguration?.posts_enabled === true;
+
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       setPage(1);
@@ -260,10 +303,12 @@ export default function EmployeeManagement({ companyId }: Props) {
         cancelled = true;
       };
     }
+    const employeeCompanyId = companyId;
+    async function loadEmployees() {
+      setLoading(true);
 
-    const loadEmployees = async () => {
       try {
-        const result = await getEmployees(companyId, {
+        const result = await getEmployees(employeeCompanyId, {
           page,
           page_size: pageSize,
           search,
@@ -288,11 +333,9 @@ export default function EmployeeManagement({ companyId }: Props) {
         setError(message);
         showError(message);
       } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
-    };
+    }
 
     void loadEmployees();
 
@@ -309,12 +352,14 @@ export default function EmployeeManagement({ companyId }: Props) {
     refreshKey,
     showError,
   ]);
+
   useEffect(() => {
     let cancelled = false;
 
     async function loadCustomFieldDefinitions() {
       if (!companyId) {
         setCustomFieldDefinitions([]);
+        setCustomFieldsLoading(false);
         return;
       }
 
@@ -334,14 +379,12 @@ export default function EmployeeManagement({ companyId }: Props) {
               ),
           );
         }
-      } catch (error) {
+      } catch (err) {
         if (!cancelled) {
-          console.error("Failed to load employee field definitions:", error);
+          console.error("Failed to load employee field definitions:", err);
         }
       } finally {
-        if (!cancelled) {
-          setCustomFieldsLoading(false);
-        }
+        if (!cancelled) setCustomFieldsLoading(false);
       }
     }
 
@@ -353,16 +396,72 @@ export default function EmployeeManagement({ companyId }: Props) {
   }, [companyId]);
 
   useEffect(() => {
-    const companyId = currentCompany?.id;
-
-    if (!companyId) {
-      return;
-    }
-
     let cancelled = false;
 
-    const loadAssignmentOptions = async () => {
+    if (companyId === null) {
+      return () => {
+        cancelled = true;
+      };
+    }
+    const activeCompanyId = companyId;
+    async function loadOrganizationConfiguration() {
+      setOrganizationConfigurationLoading(true);
+
       try {
+        const configuration =
+          await getOrganizationConfiguration(activeCompanyId);
+
+        if (!cancelled) {
+          setOrganizationConfiguration(configuration);
+          setOrganizationConfigurationError(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setOrganizationConfiguration(null);
+          setOrganizationConfigurationError(
+            err instanceof Error
+              ? err.message
+              : "Unable to load organization configuration.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setOrganizationConfigurationLoading(false);
+        }
+      }
+    }
+
+    void loadOrganizationConfiguration();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (companyId === null || currentCompany?.id !== companyId) {
+      return () => {
+        cancelled = true;
+      };
+    }
+    const assignmentCompanyId = companyId;
+
+    async function loadAssignmentOptions() {
+      try {
+        const results = await Promise.allSettled([
+          getDepartments(assignmentCompanyId),
+          getDesignations(assignmentCompanyId),
+          getTeams(assignmentCompanyId),
+          getBranches(assignmentCompanyId),
+          getSites(assignmentCompanyId),
+          getPosts(assignmentCompanyId),
+          getEmploymentTypes(assignmentCompanyId),
+        ]);
+
+        if (cancelled) return;
+
         const [
           departmentResult,
           designationResult,
@@ -371,49 +470,81 @@ export default function EmployeeManagement({ companyId }: Props) {
           siteResult,
           postResult,
           employmentTypeResult,
-        ] = await Promise.all([
-          getDepartments(companyId),
-          getDesignations(companyId),
-          getTeams(companyId),
-          getBranches(companyId),
-          getSites(companyId),
-          getPosts(companyId),
-          getEmploymentTypes(companyId),
-        ]);
+        ] = results;
 
-        if (cancelled) return;
+        if (departmentResult.status === "fulfilled") {
+          setDepartments(departmentResult.value.departments);
+        }
 
-        setDepartments(departmentResult.departments);
-        setDesignations(designationResult.designations);
-        setTeams(teamResult.teams);
-        setBranches(branchResult.branches);
-        setSites(siteResult.sites);
-        setPosts(postResult.posts);
-        setEmploymentTypes(employmentTypeResult);
-      } catch (error) {
+        if (designationResult.status === "fulfilled") {
+          setDesignations(designationResult.value.designations);
+        }
+
+        if (teamResult.status === "fulfilled") {
+          setTeams(teamResult.value.teams);
+        }
+
+        if (branchResult.status === "fulfilled") {
+          setBranches(branchResult.value.branches);
+        }
+
+        if (siteResult.status === "fulfilled") {
+          setSites(siteResult.value.sites);
+        }
+
+        if (postResult.status === "fulfilled") {
+          setPosts(postResult.value.posts);
+        }
+
+        if (employmentTypeResult.status === "fulfilled") {
+          setEmploymentTypes(employmentTypeResult.value);
+        }
+      } catch (err) {
         if (!cancelled) {
-          console.error("Failed to load employee assignment options:", error);
+          console.error("Failed to load employee assignment options:", err);
         }
       }
-    };
+    }
 
     void loadAssignmentOptions();
 
     return () => {
       cancelled = true;
     };
-  }, [currentCompany?.id]);
+  }, [companyId, currentCompany?.id]);
 
-  function openCreateModal() {
+  const openCreateModal = useCallback(() => {
+    if (!configurationReady) return;
+
     setEditingEmployee(null);
     setForm(EMPTY_FORM);
+    setActiveFormStep(0);
     setError(null);
     setShowModal(true);
-  }
+  }, [configurationReady]);
+  useEffect(() => {
+    if (action !== "create" || !configurationReady) return;
+
+    const timeoutId = setTimeout(() => {
+      openCreateModal();
+      router.replace("/employees");
+    }, 0);
+
+    return () => clearTimeout(timeoutId);
+  }, [action, configurationReady, openCreateModal, router]);
 
   function openEditModal(employee: Employee) {
+    if (!configurationReady) {
+      setError(
+        organizationConfigurationError ??
+          "Organization configuration is still loading. Please try again.",
+      );
+      return;
+    }
+
     setEditingEmployee(employee);
     setForm(toForm(employee));
+    setActiveFormStep(0);
     setError(null);
     setShowModal(true);
   }
@@ -423,15 +554,32 @@ export default function EmployeeManagement({ companyId }: Props) {
     setShowModal(false);
     setEditingEmployee(null);
     setForm(EMPTY_FORM);
+    setActiveFormStep(0);
     setError(null);
   }
 
   async function handleSave(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    // Prevent saving until the final step.
+    if (activeFormStep !== EMPLOYEE_FORM_STEPS.length - 1) {
+      console.warn("Blocked employee submission before final step.");
+      return;
+    }
+
     if (companyId === null) return;
+
+    if (!configurationReady || !organizationConfiguration) {
+      setError(
+        organizationConfigurationError ??
+          "Organization configuration is unavailable. Please try again.",
+      );
+      return;
+    }
 
     if (!form.first_name.trim()) {
       setError("First name is required.");
+      
       return;
     }
 
@@ -441,8 +589,27 @@ export default function EmployeeManagement({ companyId }: Props) {
 
       const payload = toPayload(form);
 
+      // Never submit assignments for organization features that are disabled.
+      if (!organizationConfiguration.departments_enabled) {
+        payload.department_id = null;
+      }
+      if (!organizationConfiguration.designations_enabled) {
+        payload.designation_id = null;
+      }
+      if (!organizationConfiguration.teams_enabled) {
+        payload.team_id = null;
+      }
+      if (!organizationConfiguration.branches_enabled) {
+        payload.branch_id = null;
+      }
+      if (!organizationConfiguration.sites_enabled) {
+        payload.site_id = null;
+      }
+      if (!organizationConfiguration.posts_enabled) {
+        payload.post_id = null;
+      }
+
       if (editingEmployee) {
-        // Employee code is generated on creation and is not editable here.
         await updateEmployee(
           companyId,
           editingEmployee.id,
@@ -458,6 +625,7 @@ export default function EmployeeManagement({ companyId }: Props) {
       setShowModal(false);
       setEditingEmployee(null);
       setForm(EMPTY_FORM);
+      setActiveFormStep(0);
       setRefreshKey((current) => current + 1);
     } catch (err) {
       const message =
@@ -469,6 +637,39 @@ export default function EmployeeManagement({ companyId }: Props) {
     }
   }
 
+  function validateFormStep(step: number): boolean {
+    if (step === 0) {
+      if (!form.first_name.trim()) {
+        setError("First name is required before continuing.");
+        return false;
+      }
+    }
+
+    if (step === 1) {
+      if (!form.employment_status) {
+        setError("Please select an employment status.");
+        return false;
+      }
+    }
+
+    setError(null);
+    return true;
+  }
+
+  function handleNextStep() {
+    if (!validateFormStep(activeFormStep)) return;
+
+    if (activeFormStep < EMPLOYEE_FORM_STEPS.length - 1) {
+      setError(null);
+      setActiveFormStep(activeFormStep + 1);
+    }
+  }
+
+  function handlePreviousStep() {
+    setError(null);
+    setActiveFormStep((current) => Math.max(current - 1, 0));
+  }
+
   async function handleConfirmStatus() {
     if (companyId === null || statusEmployee === null) return;
 
@@ -478,8 +679,10 @@ export default function EmployeeManagement({ companyId }: Props) {
     try {
       setSaving(true);
 
-      // Preserve the employee's existing details while changing active state.
+      // This action changes only employee active status.
+      // Keep the other existing employee assignments intact.
       const payload = toPayload(toForm(employee));
+
       await updateEmployee(companyId, employee.id, {
         ...toUpdatePayload(payload),
         is_active: nextActive,
@@ -514,7 +717,6 @@ export default function EmployeeManagement({ companyId }: Props) {
       setAuditLoading(true);
 
       const logs = await getEntityAuditLogs(companyId, "EMPLOYEE", employee.id);
-
       setAuditLogs(logs);
     } catch (err) {
       setAuditError(
@@ -553,12 +755,20 @@ export default function EmployeeManagement({ companyId }: Props) {
         <button
           type="button"
           onClick={openCreateModal}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-[var(--brand-color)] px-3.5 text-xs font-medium text-white transition hover:opacity-90"
+          disabled={!configurationReady}
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-[var(--brand-color)] px-3.5 text-xs font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Plus size={15} />
           Add Employee
         </button>
       </div>
+
+      {organizationConfigurationError && (
+        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          Unable to load organization configuration:{" "}
+          {organizationConfigurationError}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <div className="relative sm:col-span-2">
@@ -640,7 +850,8 @@ export default function EmployeeManagement({ companyId }: Props) {
               <button
                 type="button"
                 onClick={openCreateModal}
-                className="mt-3 text-xs font-medium text-[var(--brand-color)] hover:underline"
+                disabled={!configurationReady}
+                className="mt-3 text-xs font-medium text-[var(--brand-color)] hover:underline disabled:opacity-50"
               >
                 Add employee
               </button>
@@ -729,9 +940,10 @@ export default function EmployeeManagement({ companyId }: Props) {
                         <button
                           type="button"
                           onClick={() => openEditModal(employee)}
+                          disabled={!configurationReady}
                           title="Edit employee"
                           aria-label={`Edit ${employeeName(employee)}`}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-[var(--brand-color)]"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-[var(--brand-color)] disabled:opacity-50"
                         >
                           <Pencil size={15} />
                         </button>
@@ -830,113 +1042,264 @@ export default function EmployeeManagement({ companyId }: Props) {
               </p>
             </div>
 
-            <form onSubmit={handleSave}>
-              <div className="space-y-5 px-5 py-5">
-                {error && (
-                  <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                    {error}
-                  </div>
-                )}
-
-                <PersonalDetailsSection
-                  form={form}
-                  updateField={updateField}
-                  editingEmployee={Boolean(editingEmployee)}
-                />
-
-                <EmploymentDetailsSection
-                  form={form}
-                  updateField={updateField}
-                  statuses={STATUSES}
-                  prettyStatus={prettyStatus}
-                />
-
-                <JobDetailsSection
-                  form={form}
-                  updateField={updateField}
-                  departments={departments}
-                  designations={designations}
-                  teams={teams}
-                  branches={branches}
-                  sites={sites}
-                  posts={posts}
-                  employmentTypes={employmentTypes}
-                  managers={managers}
-                  loading={loading}
-                />
-
-                <section>
-                  <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Additional Details
-                  </h4>
-
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Field label="Height (cm)">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        value={form.height_cm}
-                        onChange={(e) =>
-                          updateField("height_cm", e.target.value)
-                        }
-                        className={inputClass}
-                        placeholder="e.g. 175"
-                      />
-                    </Field>
-
-                    <Field label="Weight (kg)">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        value={form.weight_kg}
-                        onChange={(e) =>
-                          updateField("weight_kg", e.target.value)
-                        }
-                        className={inputClass}
-                        placeholder="e.g. 70"
-                      />
-                    </Field>
-                  </div>
-                </section>
-
-                <section>
-                  <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Notes
-                  </h4>
-                  <textarea
-                    rows={3}
-                    value={form.notes}
-                    onChange={(e) => updateField("notes", e.target.value)}
-                    className={`${inputClass} h-auto py-2`}
-                    placeholder="Optional notes"
-                  />
-                </section>
+            {organizationConfigurationLoading ? (
+              <div className="px-5 py-10 text-center text-sm text-slate-500">
+                Loading organization configuration...
               </div>
-
-              <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white px-5 py-3">
+            ) : organizationConfigurationError ? (
+              <div className="px-5 py-6">
+                <p className="text-sm text-red-700">
+                  {organizationConfigurationError}
+                </p>
                 <button
                   type="button"
-                  onClick={closeModal}
-                  disabled={saving}
-                  className="h-9 rounded-md px-3 text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+                  onClick={() => setRefreshKey((current) => current + 1)}
+                  className="mt-3 rounded-md border border-slate-200 px-3 py-2 text-xs"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="h-9 rounded-md bg-[var(--brand-color)] px-4 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
-                >
-                  {saving
-                    ? "Saving..."
-                    : editingEmployee
-                      ? "Update Employee"
-                      : "Create Employee"}
+                  Refresh employee list
                 </button>
               </div>
-            </form>
+            ) : organizationConfiguration ? (
+              <form onSubmit={handleSave} noValidate>
+                <div className="space-y-5 px-5 py-5">
+                  {error && (
+                    <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                      {error}
+                    </div>
+                  )}
+                  <div className="mb-6">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">
+                          Step {activeFormStep + 1} of{" "}
+                          {EMPLOYEE_FORM_STEPS.length}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {EMPLOYEE_FORM_STEPS[activeFormStep].description}
+                        </p>
+                      </div>
+
+                      <span className="text-xs font-medium text-slate-500">
+                        {Math.round(
+                          ((activeFormStep + 1) / EMPLOYEE_FORM_STEPS.length) *
+                            100,
+                        )}
+                        % complete
+                      </span>
+                    </div>
+
+                    <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full bg-[var(--brand-color)] transition-all duration-300"
+                        style={{
+                          width: `${
+                            ((activeFormStep + 1) /
+                              EMPLOYEE_FORM_STEPS.length) *
+                            100
+                          }%`,
+                        }}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      {EMPLOYEE_FORM_STEPS.map((step, index) => (
+                        <button
+                          key={step.title}
+                          type="button"
+                          onClick={() => {
+                            if (index <= activeFormStep) {
+                              setError(null);
+                              setActiveFormStep(index);
+                              return;
+                            }
+
+                            if (
+                              index === activeFormStep + 1 &&
+                              validateFormStep(activeFormStep)
+                            ) {
+                              setActiveFormStep(index);
+                            }
+                          }}
+                          className={`rounded-lg border px-2 py-3 text-left transition ${
+                            index === activeFormStep
+                              ? "border-[var(--brand-color)] bg-[var(--brand-color-soft)]"
+                              : index < activeFormStep
+                                ? "border-slate-200 bg-slate-50"
+                                : "border-slate-200 bg-white"
+                          }`}
+                        >
+                          <span className="block text-[10px] text-slate-500">
+                            STEP {index + 1}
+                          </span>
+                          <span className="mt-1 block text-xs font-medium text-slate-800">
+                            {step.title}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {activeFormStep === 0 && (
+                    <PersonalDetailsSection
+                      form={form}
+                      updateField={updateField}
+                      editingEmployee={Boolean(editingEmployee)}
+                    />
+                  )}
+
+                  {activeFormStep === 1 && (
+                    <EmploymentDetailsSection
+                      form={form}
+                      updateField={updateField}
+                      statuses={STATUSES}
+                      prettyStatus={prettyStatus}
+                    />
+                  )}
+
+                  {activeFormStep === 2 && (
+                    <>
+                      <JobDetailsSection
+                        companyId={companyId}
+                        form={form}
+                        updateField={updateField}
+                        departments={departments}
+                        designations={designations}
+                        teams={teams}
+                        branches={branches}
+                        sites={sites}
+                        posts={posts}
+                        employmentTypes={employmentTypes}
+                        managers={managers}
+                        loading={loading}
+                        showDepartments={showDepartments}
+                        showDesignations={showDesignations}
+                        showTeams={showTeams}
+                        showBranches={showBranches}
+                        showSites={showSites}
+                        showPosts={showPosts}
+                      />
+
+                      <section>
+                        <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Additional Details
+                        </h4>
+
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                          <Field label="Height (cm)">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.1"
+                              value={form.height_cm}
+                              onChange={(event) =>
+                                updateField("height_cm", event.target.value)
+                              }
+                              className={inputClass}
+                              placeholder="e.g. 175"
+                            />
+                          </Field>
+
+                          <Field label="Weight (kg)">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.1"
+                              value={form.weight_kg}
+                              onChange={(event) =>
+                                updateField("weight_kg", event.target.value)
+                              }
+                              className={inputClass}
+                              placeholder="e.g. 70"
+                            />
+                          </Field>
+                        </div>
+                      </section>
+
+                      <section>
+                        <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Notes
+                        </h4>
+
+                        <textarea
+                          rows={3}
+                          value={form.notes}
+                          onChange={(event) =>
+                            updateField("notes", event.target.value)
+                          }
+                          className={`${inputClass} h-auto py-2`}
+                          placeholder="Optional notes"
+                        />
+                      </section>
+
+                      {customFieldsLoading && (
+                        <p className="text-xs text-slate-500">
+                          Loading custom employee fields...
+                        </p>
+                      )}
+
+                      {customFieldDefinitions.length > 0 && (
+                        <section>
+                          <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Custom Employee Fields
+                          </h4>
+                          <p className="text-xs text-slate-500">
+                            Custom field values are not yet wired into the form.
+                          </p>
+                        </section>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                <div className="sticky bottom-0 flex items-center justify-between gap-2 border-t border-slate-200 bg-white px-5 py-3">
+                  <button
+                    type="button"
+                    onClick={handlePreviousStep}
+                    disabled={saving || activeFormStep === 0}
+                    className="h-9 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={closeModal}
+                      disabled={saving}
+                      className="h-9 rounded-md px-3 text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleNextStep}
+                      disabled={saving}
+                      hidden={activeFormStep >= EMPLOYEE_FORM_STEPS.length - 1}
+                      className="h-9 rounded-md bg-[var(--brand-color)] px-4 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
+                    >
+                      Next
+                    </button>
+
+                    <button
+                      type="submit"
+                      disabled={saving || !configurationReady}
+                      hidden={activeFormStep < EMPLOYEE_FORM_STEPS.length - 1}
+                      className="h-9 rounded-md bg-[var(--brand-color)] px-4 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
+                    >
+                      {saving
+                        ? "Saving..."
+                        : editingEmployee
+                          ? "Update Employee"
+                          : "Create Employee"}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            ) : (
+              <div className="px-5 py-10 text-center text-sm text-slate-500">
+                Organization configuration is unavailable.
+              </div>
+            )}
           </div>
         </div>
       )}

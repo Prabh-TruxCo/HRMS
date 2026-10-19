@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { inputClass } from "./EmployeeFormField";
 
 export interface SearchableSelectOption {
@@ -9,47 +9,111 @@ export interface SearchableSelectOption {
   description?: string;
 }
 
-interface SearchableSelectProps {
+interface SearchResult {
   options: SearchableSelectOption[];
+  hasMore: boolean;
+}
+
+interface SearchableSelectProps {
   value: string;
   onChange: (value: string) => void;
+  searchOptions: (query: string, page: number) => Promise<SearchResult>;
+  selectedOption?: SearchableSelectOption | null;
   placeholder?: string;
   searchPlaceholder?: string;
   disabled?: boolean;
-  loading?: boolean;
   allowClear?: boolean;
   emptyMessage?: string;
 }
 
 export function SearchableSelect({
-  options,
   value,
   onChange,
+  searchOptions,
+  selectedOption,
   placeholder = "Select an option",
   searchPlaceholder = "Search...",
   disabled = false,
-  loading = false,
   allowClear = true,
   emptyMessage = "No matching options found.",
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [options, setOptions] = useState<SearchableSelectOption[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [page, setPage] = useState(1);
+
   const containerRef = useRef<HTMLDivElement>(null);
+  const requestId = useRef(0);
 
-  const selectedOption = options.find((option) => String(option.id) === value);
+  const selected = options.find((option) => String(option.id) === value);
 
-  const filteredOptions = useMemo(() => {
-    const query = search.trim().toLowerCase();
+  const currentSelection =
+    selected ??
+    (selectedOption && String(selectedOption.id) === value
+      ? selectedOption
+      : null);
 
-    if (!query) return options;
+  const loadOptions = useCallback(
+    async (query: string, requestedPage: number) => {
+      const request = ++requestId.current;
 
-    return options.filter(
-      (option) =>
-        option.name.toLowerCase().includes(query) ||
-        String(option.id).toLowerCase().includes(query) ||
-        (option.description ?? "").toLowerCase().includes(query),
-    );
-  }, [options, search]);
+      if (requestedPage === 1) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
+
+      try {
+        const result = await searchOptions(query, requestedPage);
+
+        if (request !== requestId.current) return;
+
+        setOptions((previous) => {
+          const combined =
+            requestedPage === 1
+              ? result.options
+              : [...previous, ...result.options];
+
+          const unique = new Map(
+            combined.map((option) => [String(option.id), option]),
+          );
+
+          return Array.from(unique.values());
+        });
+
+        setHasMore(result.hasMore);
+        setPage(requestedPage);
+      } catch (error) {
+        if (request === requestId.current) {
+          console.error("Failed to search selector options:", error);
+
+          if (requestedPage === 1) {
+            setOptions([]);
+            setHasMore(false);
+          }
+        }
+      } finally {
+        if (request === requestId.current) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
+      }
+    },
+    [searchOptions],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+
+    const timer = window.setTimeout(() => {
+      void loadOptions(search.trim(), 1);
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [open, search, loadOptions]);
 
   useEffect(() => {
     if (!open) return;
@@ -59,6 +123,7 @@ export function SearchableSelect({
         containerRef.current &&
         !containerRef.current.contains(event.target as Node)
       ) {
+        requestId.current += 1;
         setOpen(false);
         setSearch("");
       }
@@ -72,6 +137,7 @@ export function SearchableSelect({
   }, [open]);
 
   function selectOption(option: SearchableSelectOption) {
+    requestId.current += 1;
     onChange(String(option.id));
     setOpen(false);
     setSearch("");
@@ -91,24 +157,22 @@ export function SearchableSelect({
       >
         <span
           className={`min-w-0 flex-1 truncate ${
-            selectedOption ? "text-slate-900" : "text-slate-400"
+            currentSelection ? "text-slate-900" : "text-slate-400"
           }`}
         >
-          {selectedOption?.name ?? placeholder}
+          {currentSelection?.name ?? placeholder}
         </span>
 
         <span className="flex shrink-0 items-center gap-2">
           {allowClear && value && !disabled && (
             <span
-              role="button"
-              aria-label="Clear selection"
+              className="text-slate-400 hover:text-slate-700"
               onClick={(event) => {
                 event.stopPropagation();
                 onChange("");
                 setSearch("");
                 setOpen(false);
               }}
-              className="text-slate-400 hover:text-slate-700"
             >
               ×
             </span>
@@ -130,17 +194,32 @@ export function SearchableSelect({
             />
           </div>
 
-          <div className="max-h-56 overflow-y-auto p-1" role="listbox">
+          <div
+            className="max-h-56 overflow-y-auto p-1"
+            role="listbox"
+            onScroll={(event) => {
+              const element = event.currentTarget;
+              const nearBottom =
+                element.scrollHeight -
+                  element.scrollTop -
+                  element.clientHeight <
+                40;
+
+              if (nearBottom && hasMore && !loading && !loadingMore) {
+                void loadOptions(search.trim(), page + 1);
+              }
+            }}
+          >
             {loading ? (
               <p className="px-3 py-4 text-center text-xs text-slate-500">
-                Loading options...
+                Searching...
               </p>
-            ) : filteredOptions.length === 0 ? (
+            ) : options.length === 0 ? (
               <p className="px-3 py-4 text-center text-xs text-slate-500">
                 {emptyMessage}
               </p>
             ) : (
-              filteredOptions.map((option) => {
+              options.map((option) => {
                 const isSelected = String(option.id) === value;
 
                 return (
@@ -150,7 +229,7 @@ export function SearchableSelect({
                     role="option"
                     aria-selected={isSelected}
                     onClick={() => selectOption(option)}
-                    className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-xs transition-colors ${
+                    className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-xs ${
                       isSelected
                         ? "bg-[var(--brand-color-soft)] font-medium text-slate-900"
                         : "text-slate-700 hover:bg-slate-50"
@@ -164,15 +243,18 @@ export function SearchableSelect({
                         </span>
                       )}
                     </span>
-
                     {isSelected && (
-                      <span className="shrink-0 text-[var(--brand-color)]">
-                        ✓
-                      </span>
+                      <span className="text-[var(--brand-color)]">✓</span>
                     )}
                   </button>
                 );
               })
+            )}
+
+            {loadingMore && (
+              <p className="px-3 py-2 text-center text-xs text-slate-500">
+                Loading more...
+              </p>
             )}
           </div>
 
@@ -185,7 +267,7 @@ export function SearchableSelect({
                   setOpen(false);
                   setSearch("");
                 }}
-                className="w-full rounded-md px-3 py-2 text-left text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                className="w-full rounded-md px-3 py-2 text-left text-xs text-slate-500 hover:bg-slate-50"
               >
                 Clear selection
               </button>

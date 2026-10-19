@@ -47,7 +47,26 @@ const NAV: NavSection[] = [
         icon: LayoutDashboard,
         exact: true,
       },
-      { label: "Employees", href: "/employees", icon: Users },
+      {
+        label: "Employees",
+        href: "/employees",
+        icon: Users,
+        children: [
+          {
+            label: "All Employees",
+            href: "/employees",
+            exact: true,
+          },
+          {
+            label: "Add Employee",
+            href: "/employees?action=create",
+          },
+          {
+            label: "Employee ID Settings",
+            href: "/employees/settings/id",
+          },
+        ],
+      },
       {
         label: "Organization",
         href: "/organization",
