@@ -85,6 +85,7 @@ const EMPTY_FORM: EmployeeForm = {
   employment_type_id: "",
   manager_id: "",
   post_id: "",
+  office_location_id: "",
 };
 
 const STATUSES = [
@@ -152,6 +153,10 @@ function toForm(employee: Employee): EmployeeForm {
         : String(employee.employment_type_id),
     manager_id: employee.manager_id == null ? "" : String(employee.manager_id),
     post_id: employee.post_id == null ? "" : String(employee.post_id),
+    office_location_id:
+      employee.office_location_id == null
+        ? ""
+        : String(employee.office_location_id),
   };
 }
 
@@ -187,6 +192,9 @@ function toPayload(form: EmployeeForm): EmployeePayload {
       : null,
     manager_id: form.manager_id ? Number(form.manager_id) : null,
     post_id: form.post_id ? Number(form.post_id) : null,
+    office_location_id: form.office_location_id
+      ? Number(form.office_location_id)
+      : null,
   };
 }
 
@@ -579,7 +587,7 @@ export default function EmployeeManagement({ companyId }: Props) {
 
     if (!form.first_name.trim()) {
       setError("First name is required.");
-      
+
       return;
     }
 

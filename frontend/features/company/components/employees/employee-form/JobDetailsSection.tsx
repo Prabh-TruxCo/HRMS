@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { EmployeeForm } from "./employeeForm.types";
 import { EmployeeFormField as Field } from "./EmployeeFormField";
 import {
@@ -8,14 +8,30 @@ import {
   type SearchableSelectOption,
 } from "./SearchableSelect";
 
-import { getDepartments } from "@/features/company/services/departmentService";
-import { getDesignations } from "@/features/company/services/designationService";
-import { getTeams } from "@/features/company/services/teamService";
-import { getBranches } from "@/features/company/services/branchService";
-import { getSites } from "@/features/company/services/siteService";
-import { getPosts } from "@/features/company/services/postService";
+import {
+  getOfficeLocation,
+  getOfficeLocations,
+} from "@/features/company/services/officeLocationService";
+import {
+  getDepartment,
+  getDepartments,
+} from "@/features/company/services/departmentService";
+import {
+  getDesignation,
+  getDesignations,
+} from "@/features/company/services/designationService";
+import { getTeam, getTeams } from "@/features/company/services/teamService";
+import {
+  getBranch,
+  getBranches,
+} from "@/features/company/services/branchService";
+import { getSite, getSites } from "@/features/company/services/siteService";
+import { getPost, getPosts } from "@/features/company/services/postService";
 import { getEmploymentTypes } from "@/features/company/services/employmentService";
-import { getEmployees } from "@/features/company/services/employeeService";
+import {
+  getEmployee,
+  getEmployees,
+} from "@/features/company/services/employeeService";
 
 export type AssignmentOption = {
   id: number;
@@ -75,6 +91,143 @@ export default function JobDetailsSection({
   showSites,
   showPosts,
 }: Props) {
+  const [selectedDepartment, setSelectedDepartment] =
+    useState<SearchableSelectOption | null>(null);
+  const [selectedDesignation, setSelectedDesignation] =
+    useState<SearchableSelectOption | null>(null);
+  const [selectedTeam, setSelectedTeam] =
+    useState<SearchableSelectOption | null>(null);
+  const [selectedBranch, setSelectedBranch] =
+    useState<SearchableSelectOption | null>(null);
+  const [selectedSite, setSelectedSite] =
+    useState<SearchableSelectOption | null>(null);
+  const [selectedPost, setSelectedPost] =
+    useState<SearchableSelectOption | null>(null);
+  const [selectedOfficeLocation, setSelectedOfficeLocation] =
+    useState<SearchableSelectOption | null>(null);
+  const [selectedManager, setSelectedManager] =
+    useState<SearchableSelectOption | null>(null);
+
+  // Resolve saved IDs to their labels, even when the records
+  // aren't present on the first page of the dropdown results.
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadOption = async (
+      id: string,
+      fetchOption: (id: number) => Promise<{ id: number; name: string }>,
+      setOption: (option: SearchableSelectOption | null) => void,
+    ): Promise<void> => {
+      if (!id) {
+        setOption(null);
+        return;
+      }
+
+      try {
+        const item = await fetchOption(Number(id));
+
+        if (!cancelled) {
+          setOption({
+            id: item.id,
+            name: item.name,
+          });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error(`Failed to load selected option ${id}:`, error);
+          setOption(null);
+        }
+      }
+    };
+
+    const loadManager = async (): Promise<void> => {
+      if (!form.manager_id) {
+        setSelectedManager(null);
+        return;
+      }
+
+      try {
+        const employee = await getEmployee(companyId, Number(form.manager_id));
+
+        if (!cancelled) {
+          setSelectedManager({
+            id: employee.id,
+            name:
+              `${employee.first_name ?? ""} ${
+                employee.last_name ?? ""
+              }`.trim() ||
+              employee.display_name ||
+              `Employee ${employee.id}`,
+          });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Failed to load reporting manager:", error);
+          setSelectedManager(null);
+        }
+      }
+    };
+
+    const loadSelectedOptions = async (): Promise<void> => {
+      await Promise.all([
+        loadOption(
+          form.department_id,
+          (id) => getDepartment(companyId, id),
+          setSelectedDepartment,
+        ),
+        loadOption(
+          form.designation_id,
+          (id) => getDesignation(companyId, id),
+          setSelectedDesignation,
+        ),
+        loadOption(
+          form.team_id,
+          (id) => getTeam(companyId, id),
+          setSelectedTeam,
+        ),
+        loadOption(
+          form.branch_id,
+          (id) => getBranch(companyId, id),
+          setSelectedBranch,
+        ),
+        loadOption(
+          form.site_id,
+          (id) => getSite(companyId, id),
+          setSelectedSite,
+        ),
+        loadOption(
+          form.post_id,
+          (id) => getPost(companyId, id),
+          setSelectedPost,
+        ),
+        form.branch_id && form.office_location_id
+          ? loadOption(
+              form.office_location_id,
+              (id) => getOfficeLocation(companyId, Number(form.branch_id), id),
+              setSelectedOfficeLocation,
+            )
+          : Promise.resolve(),
+        loadManager(),
+      ]);
+    };
+
+    void loadSelectedOptions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    companyId,
+    form.department_id,
+    form.designation_id,
+    form.team_id,
+    form.branch_id,
+    form.site_id,
+    form.post_id,
+    form.office_location_id,
+    form.manager_id,
+  ]);
+
   const searchDepartments = useCallback(
     async (query: string, page: number): Promise<SearchResult> => {
       const result = await getDepartments(companyId, {
@@ -156,6 +309,33 @@ export default function JobDetailsSection({
     [companyId],
   );
 
+  const searchOfficeLocations = useCallback(
+    async (query: string, page: number): Promise<SearchResult> => {
+      if (!form.branch_id) {
+        return { options: [], hasMore: false };
+      }
+
+      const result = await getOfficeLocations(
+        companyId,
+        Number(form.branch_id),
+        {
+          page,
+          page_size: PAGE_SIZE,
+          search: query,
+        },
+      );
+
+      return {
+        options: result.locations.map((location) => ({
+          id: location.id,
+          name: location.name,
+        })),
+        hasMore: result.page < result.total_pages,
+      };
+    },
+    [companyId, form.branch_id],
+  );
+
   const searchSites = useCallback(
     async (query: string, page: number): Promise<SearchResult> => {
       const result = await getSites(companyId, {
@@ -201,7 +381,6 @@ export default function JobDetailsSection({
 
   const searchEmploymentTypes = useCallback(
     async (query: string, page: number): Promise<SearchResult> => {
-      // The current service returns an array rather than a paginated result.
       if (page > 1) {
         return { options: [], hasMore: false };
       }
@@ -266,9 +445,15 @@ export default function JobDetailsSection({
               key={`department-${companyId}`}
               searchOptions={searchDepartments}
               value={form.department_id}
-              selectedOption={departments.find(
-                (item) => String(item.id) === form.department_id,
-              )}
+              selectedOption={
+                departments.find(
+                  (item) => String(item.id) === form.department_id,
+                ) ??
+                (selectedDepartment &&
+                String(selectedDepartment.id) === form.department_id
+                  ? selectedDepartment
+                  : null)
+              }
               onChange={(value) => {
                 updateField("department_id", value);
                 updateField("team_id", "");
@@ -286,9 +471,15 @@ export default function JobDetailsSection({
               key={`designation-${companyId}`}
               searchOptions={searchDesignations}
               value={form.designation_id}
-              selectedOption={designations.find(
-                (item) => String(item.id) === form.designation_id,
-              )}
+              selectedOption={
+                designations.find(
+                  (item) => String(item.id) === form.designation_id,
+                ) ??
+                (selectedDesignation &&
+                String(selectedDesignation.id) === form.designation_id
+                  ? selectedDesignation
+                  : null)
+              }
               onChange={(value) => updateField("designation_id", value)}
               placeholder="Select designation"
               searchPlaceholder="Search designations..."
@@ -303,9 +494,12 @@ export default function JobDetailsSection({
               key={`team-${companyId}-${form.department_id}`}
               searchOptions={searchTeams}
               value={form.team_id}
-              selectedOption={teams.find(
-                (item) => String(item.id) === form.team_id,
-              )}
+              selectedOption={
+                teams.find((item) => String(item.id) === form.team_id) ??
+                (selectedTeam && String(selectedTeam.id) === form.team_id
+                  ? selectedTeam
+                  : null)
+              }
               onChange={(value) => updateField("team_id", value)}
               placeholder="Select team"
               searchPlaceholder="Search teams..."
@@ -320,13 +514,43 @@ export default function JobDetailsSection({
               key={`branch-${companyId}`}
               searchOptions={searchBranches}
               value={form.branch_id}
-              selectedOption={branches.find(
-                (item) => String(item.id) === form.branch_id,
-              )}
-              onChange={(value) => updateField("branch_id", value)}
+              selectedOption={
+                branches.find((item) => String(item.id) === form.branch_id) ??
+                (selectedBranch && String(selectedBranch.id) === form.branch_id
+                  ? selectedBranch
+                  : null)
+              }
+              onChange={(value) => {
+                updateField("branch_id", value);
+                updateField("office_location_id", "");
+              }}
               placeholder="Select branch"
               searchPlaceholder="Search branches..."
               disabled={loading}
+            />
+          </Field>
+        )}
+
+        {showBranches && (
+          <Field label="Office Location">
+            <SearchableSelect
+              key={`office-location-${companyId}-${form.branch_id}`}
+              searchOptions={searchOfficeLocations}
+              value={form.office_location_id}
+              selectedOption={
+                selectedOfficeLocation &&
+                String(selectedOfficeLocation.id) === form.office_location_id
+                  ? selectedOfficeLocation
+                  : null
+              }
+              onChange={(value) => updateField("office_location_id", value)}
+              placeholder={
+                form.branch_id
+                  ? "Select office location"
+                  : "Select branch first"
+              }
+              searchPlaceholder="Search office locations..."
+              disabled={loading || !form.branch_id}
             />
           </Field>
         )}
@@ -337,9 +561,12 @@ export default function JobDetailsSection({
               key={`site-${companyId}`}
               searchOptions={searchSites}
               value={form.site_id}
-              selectedOption={sites.find(
-                (item) => String(item.id) === form.site_id,
-              )}
+              selectedOption={
+                sites.find((item) => String(item.id) === form.site_id) ??
+                (selectedSite && String(selectedSite.id) === form.site_id
+                  ? selectedSite
+                  : null)
+              }
               onChange={(value) => {
                 updateField("site_id", value);
                 updateField("post_id", "");
@@ -357,9 +584,12 @@ export default function JobDetailsSection({
               key={`post-${companyId}-${form.site_id}`}
               searchOptions={searchPosts}
               value={form.post_id}
-              selectedOption={posts.find(
-                (item) => String(item.id) === form.post_id,
-              )}
+              selectedOption={
+                posts.find((item) => String(item.id) === form.post_id) ??
+                (selectedPost && String(selectedPost.id) === form.post_id
+                  ? selectedPost
+                  : null)
+              }
               onChange={(value) => updateField("post_id", value)}
               placeholder="Select post"
               searchPlaceholder="Search posts..."
@@ -373,9 +603,11 @@ export default function JobDetailsSection({
             key={`employment-type-${companyId}`}
             searchOptions={searchEmploymentTypes}
             value={form.employment_type_id}
-            selectedOption={employmentTypes.find(
-              (item) => String(item.id) === form.employment_type_id,
-            )}
+            selectedOption={
+              employmentTypes.find(
+                (item) => String(item.id) === form.employment_type_id,
+              ) ?? null
+            }
             onChange={(value) => updateField("employment_type_id", value)}
             placeholder="Select employment type"
             searchPlaceholder="Search employment types..."
@@ -388,9 +620,12 @@ export default function JobDetailsSection({
             key={`manager-${companyId}`}
             searchOptions={searchManagers}
             value={form.manager_id}
-            selectedOption={managers.find(
-              (item) => String(item.id) === form.manager_id,
-            )}
+            selectedOption={
+              managers.find((item) => String(item.id) === form.manager_id) ??
+              (selectedManager && String(selectedManager.id) === form.manager_id
+                ? selectedManager
+                : null)
+            }
             onChange={(value) => updateField("manager_id", value)}
             placeholder="Select reporting manager"
             searchPlaceholder="Search employees..."

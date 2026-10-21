@@ -25,6 +25,7 @@ class EmployeeCreateRequest(BaseModel):
     designation_id: int | None = Field(default=None, gt=0)
     team_id: int | None = Field(default=None, gt=0)
     branch_id: int | None = Field(default=None, gt=0)
+    office_location_id: int | None = Field(default=None, gt=0)
     site_id: int | None = Field(default=None, gt=0)
     post_id: int | None = Field(default=None, gt=0)
     employment_type_id: int | None = Field(default=None, gt=0)
@@ -64,6 +65,7 @@ class EmployeeUpdateRequest(BaseModel):
     designation_id: int | None = Field(default=None, gt=0)
     team_id: int | None = Field(default=None, gt=0)
     branch_id: int | None = Field(default=None, gt=0)
+    office_location_id: int | None = Field(default=None, gt=0)
     site_id: int | None = Field(default=None, gt=0)
     post_id: int | None = Field(default=None, gt=0)
     employment_type_id: int | None = Field(default=None, gt=0)
@@ -108,6 +110,7 @@ class EmployeeResponse(BaseModel):
     designation_id: int | None
     team_id: int | None
     branch_id: int | None
+    office_location_id: int | None
     site_id: int | None
     post_id: int | None
     employment_type_id: int | None

@@ -34,6 +34,7 @@ export type Employee = {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  office_location_id: number | null;
 };
 
 export type EmployeePayload = {
@@ -55,6 +56,7 @@ export type EmployeePayload = {
   branch_id?: number | null;
   site_id?: number | null;
   post_id?: number | null;
+  office_location_id: number | null;
   employment_type_id?: number | null;
   manager_id?: number | null;
   joining_date?: string | null;

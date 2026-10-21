@@ -28,4 +28,5 @@ export type EmployeeForm = {
   employment_type_id: string;
   manager_id: string;
   post_id: string;
+  office_location_id: string;
 };

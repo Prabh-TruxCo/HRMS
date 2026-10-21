@@ -27,6 +27,7 @@ class EmployeeService:
         "designation_id": "designation",
         "team_id": "team",
         "branch_id": "branch",
+        "office_location_id": "office_location",
         "site_id": "site",
         "employment_type_id": "employment_type",
     }
@@ -91,6 +92,7 @@ class EmployeeService:
             "designation_id",
             "team_id",
             "branch_id",
+            "office_location_id",
             "site_id",
             "post_id",
             "employment_type_id",
@@ -201,6 +203,7 @@ class EmployeeService:
         from app.models.site import Site
         from app.models.team import Team
         from app.models.post import Post
+        from app.models.office_location import OfficeLocation
 
         model_map = {
             "department_id": Department,
@@ -223,7 +226,67 @@ class EmployeeService:
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=f"Invalid {field}: record does not belong to this company.",
                 )
+        # Validate the employee's office location against the company and branch.
+        office_location_id = data.get("office_location_id")
 
+        if office_location_id is not None:
+            office_location = db.get(OfficeLocation, office_location_id)
+
+            if (
+                office_location is None
+                or office_location.company_id != company_id
+                or not office_location.is_active
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        "Office location must be active and belong "
+                        "to the selected company."
+                    ),
+                )
+
+            if "branch_id" in data:
+                selected_branch_id = data["branch_id"]
+            elif current_employee_id is not None:
+                current_employee = EmployeeService._get_employee(
+                    db, company_id, current_employee_id
+                )
+                selected_branch_id = current_employee.branch_id
+            else:
+                selected_branch_id = None
+
+            if (
+                selected_branch_id is None
+                or office_location.branch_id != selected_branch_id
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=("Office location must belong to the selected branch."),
+                )
+
+        # Prevent a branch change from retaining an incompatible office.
+        elif current_employee_id is not None:
+            current_employee = EmployeeService._get_employee(
+                db, company_id, current_employee_id
+            )
+
+            branch_was_changed = (
+                "branch_id" in data and data["branch_id"] != current_employee.branch_id
+            )
+
+            if (
+                branch_was_changed
+                and current_employee.office_location_id is not None
+                and "office_location_id" not in data
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        "The employee's current office location belongs "
+                        "to the previous branch. Clear it or select a "
+                        "location for the new branch."
+                    ),
+                )
         post_id = data.get("post_id")
 
         if post_id is not None:
