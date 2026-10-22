@@ -105,12 +105,12 @@ const EMPLOYEE_FORM_STEPS = [
     description: "Basic identity and contact details",
   },
   {
-    title: "Employment Details",
-    description: "Employment status and important dates",
+    title: "Organization & Job Assignment",
+    description: "Department, designation, locations, and reporting",
   },
   {
-    title: "Organization & Job Assignment",
-    description: "Department, designation, location, and reporting",
+    title: "Employment & Work Schedule",
+    description: "Employment dates, status, shift, and attendance settings",
   },
 ] as const;
 
@@ -653,7 +653,7 @@ export default function EmployeeManagement({ companyId }: Props) {
       }
     }
 
-    if (step === 1) {
+    if (step === 2) {
       if (!form.employment_status) {
         setError("Please select an employment status.");
         return false;
@@ -1154,7 +1154,7 @@ export default function EmployeeManagement({ companyId }: Props) {
                     />
                   )}
 
-                  {activeFormStep === 1 && (
+                  {activeFormStep === 2 && (
                     <EmploymentDetailsSection
                       form={form}
                       updateField={updateField}
@@ -1163,7 +1163,7 @@ export default function EmployeeManagement({ companyId }: Props) {
                     />
                   )}
 
-                  {activeFormStep === 2 && (
+                  {activeFormStep === 1 && (
                     <>
                       <JobDetailsSection
                         companyId={companyId}

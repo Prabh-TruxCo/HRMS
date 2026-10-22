@@ -38,6 +38,9 @@ from app.models.employee import (
     EmployeeFieldDefinition,
     EmployeeFieldValue,
 )
+from app.models.employee_shift_roster import EmployeeShiftRoster
+from app.models.employee_shift_roster_day import EmployeeShiftRosterDay
+from app.models.employee_shift_assignment import EmployeeShiftAssignment
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
